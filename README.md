@@ -38,6 +38,24 @@ npm run check
 npm run serve
 ```
 
+### Building for a different host
+
+Canonical tags, Open Graph URLs, schema `@id` values, the sitemap and `robots.txt` are all
+derived from `site.domain`. It defaults to `https://acebathroomrenovationsbrisbane.com`.
+When the build is served from another host — for example the `*.pages.dev` project URL while
+the custom domain is not attached — set `SITE_ORIGIN` so canonicals never point at a host
+that does not resolve:
+
+```sh
+# PowerShell
+$env:SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev"; npm run build
+
+# macOS / Linux
+SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev" npm run build
+```
+
+When the domain is attached, rebuild without the variable to restore the production origin.
+
 ---
 
 ## Project structure
@@ -143,7 +161,7 @@ The Function supports two delivery channels, used together when both are present
 | --- | --- | --- |
 | `RESEND_API_KEY` | For email | Resend API key. |
 | `QUOTE_TO_EMAIL` | For email | Destination inbox, e.g. `AceBathroomRenovationsBrisbane@gmail.com`. |
-| `QUOTE_FROM_EMAIL` | For email | Verified sender on your Resend domain, e.g. `website@acebathroomrenovationsbrisbane.com`. |
+| `QUOTE_FROM_EMAIL` | For email | Verified sender on your Resend domain, e.g. `website@acebathroomrenovationsbrisbane.com`. Until that domain is verified, `onboarding@resend.dev` works but only delivers to the Resend account owner's inbox. |
 | `QUOTE_WEBHOOK_URL` | Optional | JSON webhook for Slack, Notion, Zapier or a CRM. |
 
 If no channel is configured, the endpoint returns **HTTP 503** with a clear call/email message rather than pretending the enquiry was sent. If delivery fails, it returns **502** with the same fallback. Submissions are not stored in a database.
@@ -211,4 +229,11 @@ Run Lighthouse against the built site before launch. The current build scores 10
 - `docs/LOCAL-SEO-COMPLIANCE.md` — honest status against the supplied topic-map/local SEO checklist.
 - `docs/KEYWORD-MAP.md` — canonical page-to-keyword map, search intent and exclusions.
 
-All brand copy, imagery and code in this repository are proprietary to Ace Bathroom Renovations Brisbane.
+---
+
+## Licence
+
+Proprietary and confidential. Copyright (c) 2026 Ace Bathroom Renovations Brisbane. All rights
+reserved. No permission is granted to copy, reuse, modify or redistribute the code, written copy
+or imagery. Full terms are in [`LICENSE`](LICENSE). The self-hosted Inter and Jost webfonts are
+used under the SIL Open Font License 1.1.

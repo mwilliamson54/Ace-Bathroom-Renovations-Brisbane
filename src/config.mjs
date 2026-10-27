@@ -1,3 +1,15 @@
+/**
+ * Public origin for canonical URLs, Open Graph tags, schema @id values and the sitemap.
+ *
+ * Defaults to the production domain. Set SITE_ORIGIN at build time when the build is
+ * served from a different host — for example the *.pages.dev preview while the domain
+ * is not attached — so that canonicals never point at a host that does not resolve:
+ *
+ *   PowerShell: $env:SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev"; npm run build
+ *   POSIX:      SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev" npm run build
+ */
+const origin = (process.env.SITE_ORIGIN || "https://acebathroomrenovationsbrisbane.com").replace(/\/+$/, "");
+
 export const site = {
   name: "Ace Bathroom Renovations Brisbane",
   shortName: "Ace Bathroom Renovations",
@@ -5,7 +17,7 @@ export const site = {
   brandLine1: "ACE",
   brandLine2: "BATHROOM RENOVATIONS",
   brandLine3: "BRISBANE",
-  domain: "https://acebathroomrenovationsbrisbane.com",
+  domain: origin,
   phoneDisplay: "(07) 8590 6941",
   phoneHref: "tel:+61785906941",
   phoneIntl: "+61785906941",

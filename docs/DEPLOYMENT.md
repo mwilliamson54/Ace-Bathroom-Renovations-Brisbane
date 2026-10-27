@@ -83,7 +83,7 @@ In **Workers & Pages → your project → Settings → Environment variables**, 
 | --- | --- | --- | --- |
 | `RESEND_API_KEY` | Secret | For email | Create at <https://resend.com/api-keys>. Never commit it. |
 | `QUOTE_TO_EMAIL` | Plain text | For email | `AceBathroomRenovationsBrisbane@gmail.com` |
-| `QUOTE_FROM_EMAIL` | Plain text | For email | `website@acebathroomrenovationsbrisbane.com` — must be on a domain verified in Resend. |
+| `QUOTE_FROM_EMAIL` | Plain text | For email | `website@acebathroomrenovationsbrisbane.com` — must be on a domain verified in Resend. Until then, `onboarding@resend.dev` works as an interim sender (owner inbox only). |
 | `QUOTE_WEBHOOK_URL` | Secret (optional) | Optional | HTTPS endpoint that accepts a JSON `POST`. |
 
 You can configure **email**, **webhook**, or **both**. The Function attempts every configured channel concurrently and succeeds if at least one delivery succeeds.
@@ -105,6 +105,13 @@ Notes:
 - `reply_to` is set to the enquirer's email, so replying from the inbox goes straight back to them.
 - Resend's shared `onboarding@resend.dev` sender only delivers to the Resend account owner's address. Use a verified domain for production.
 - Do not remove existing MX records for a live mailbox. Resend sending records are separate from inbox hosting.
+
+#### Interim sender before the domain is verified
+
+If the form must go live before the custom domain exists, set
+`QUOTE_FROM_EMAIL=onboarding@resend.dev`. Resend accepts it without domain verification, but it
+will only deliver to the address that owns the Resend account, so `QUOTE_TO_EMAIL` must be that
+same inbox. Switch to the verified `website@` sender as soon as DNS is live, then redeploy.
 
 ### 2.5 Connect the custom domain
 
@@ -179,6 +186,27 @@ npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane 
 ```
 
 Wrangler uploads the `functions/` folder that exists in the current working directory. Deploying from a different directory, or uploading only `dist/` via the dashboard, leaves the Function behind.
+
+### 3.4 Deploying before the domain is attached
+
+Canonical tags, Open Graph URLs, schema `@id` values, `sitemap.xml` and `robots.txt` come from
+`site.domain`, which defaults to `https://acebathroomrenovationsbrisbane.com`. While the site is
+only served from `*.pages.dev`, build with `SITE_ORIGIN` set to that host so search engines are
+not pointed at a domain that does not resolve yet:
+
+```sh
+# PowerShell
+$env:SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev"; npm run build
+npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane --branch main
+
+# macOS / Linux
+SITE_ORIGIN="https://ace-bathroom-renovations-brisbane.pages.dev" npm run build
+npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane --branch main
+```
+
+The generated `_redirects` also omits the `www` → apex rule for `*.pages.dev` builds. After the
+custom domain is live, rebuild **without** `SITE_ORIGIN` and redeploy so canonicals return to the
+production domain.
 
 For a preview deployment:
 
