@@ -37,25 +37,24 @@ jobs:
       - name: Quality gate
         run: npm run check
 
-      - name: Verify Cloudflare credentials
+      - name: Check deploy credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "CLOUDFLARE_API_TOKEN secret is empty"
+            echo "::error::CLOUDFLARE_API_TOKEN secret is empty"
             exit 1
           fi
-          probe() {
-            code=$(curl -s -o /dev/null -w "%{http_code}" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$1")
-            echo "$2 -> HTTP $code"
-          }
-          probe https://api.cloudflare.com/client/v4/user/tokens/verify "tokens/verify"
-          probe https://api.cloudflare.com/client/v4/accounts "accounts (list)"
-          probe "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ace-bathroom-renovations-brisbane" "pages project"
-          echo "runner egress IP: $(curl -s https://api.ipify.org)"
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/ace-bathroom-renovations-brisbane")
+          echo "Cloudflare Pages API -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Cloudflare rejected the token from this runner (HTTP $code). The token is valid, so the usual causes are Client IP Address Filtering on the token, or a missing Cloudflare Pages: Edit permission."
+            exit 1
+          fi
 
       - name: Install Wrangler
         run: npm install --no-save wrangler@4.153.0
@@ -66,9 +65,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          echo "token length: ${#CLOUDFLARE_API_TOKEN}"
-          echo "account id: ${CLOUDFLARE_ACCOUNT_ID}"
-          npx wrangler whoami
           npx wrangler pages deploy dist \
             --project-name ace-bathroom-renovations-brisbane \
             --branch main \
