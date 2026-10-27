@@ -6,11 +6,13 @@
  * reputation (the reason `onboarding@resend.dev` was landing in spam).
  *
  * What it does, per submission:
- *   1. Verifies a shared token taken from the web app URL.
+ *   1. Verifies a shared token taken from the web app URL. Fails closed: the
+ *      script refuses every request until CONFIG.sharedToken is changed.
  *   2. Appends the enquiry to a Google Sheet (a permanent backup of every lead).
+ *      Works whether the script is standalone or bound to a sheet.
  *   3. Emails the enquiry to the address in CONFIG.toEmail, from that account.
  *
- * Setup: see docs/DEPLOYMENT.md §6 "Gmail relay (Google Apps Script)".
+ * Setup: see docs/DEPLOYMENT.md §3.8 "Gmail relay (Google Apps Script)".
  */
 
 var CONFIG = {
@@ -22,18 +24,25 @@ var CONFIG = {
   sheetName: 'Enquiries',
 
   // Shared secret. Must match the ?token= value in the web app URL you paste
-  // into QUOTE_WEBHOOK_URL. Change it before deploying.
+  // into QUOTE_WEBHOOK_URL. Change it before deploying — while it still reads
+  // CHANGE-ME the script rejects every request.
   sharedToken: 'CHANGE-ME-TO-A-LONG-RANDOM-STRING',
 
   // Optional: send a short confirmation to the enquirer when they gave an email.
   sendConfirmation: false
 };
 
+var DEFAULT_TOKEN = 'CHANGE-ME-TO-A-LONG-RANDOM-STRING';
+
 function doPost(e) {
   try {
     var params = e && e.parameter ? e.parameter : {};
-    if (CONFIG.sharedToken !== 'CHANGE-ME-TO-A-LONG-RANDOM-STRING' &&
-        String(params.token || '') !== CONFIG.sharedToken) {
+
+    // Fail closed. An unset token must not turn the endpoint into an open relay.
+    if (!CONFIG.sharedToken || CONFIG.sharedToken === DEFAULT_TOKEN) {
+      return jsonOut({ ok: false, error: 'sharedToken not configured' });
+    }
+    if (String(params.token || '') !== CONFIG.sharedToken) {
       return jsonOut({ ok: false, error: 'unauthorised' });
     }
 
@@ -42,10 +51,17 @@ function doPost(e) {
       return jsonOut({ ok: false, error: 'empty submission' });
     }
 
-    appendToSheet(data);
+    // A sheet problem must never lose the lead: email first, then archive.
+    var sheetStatus = 'ok';
+    try {
+      appendToSheet(data);
+    } catch (error) {
+      sheetStatus = 'failed: ' + String(error && error.message ? error.message : error);
+    }
+
     sendEnquiryEmail(data);
 
-    return jsonOut({ ok: true, id: data.receivedAt || new Date().toISOString() });
+    return jsonOut({ ok: true, id: data.receivedAt, sheet: sheetStatus });
   } catch (error) {
     // Still return 200 with ok:false so the caller logs a useful reason.
     return jsonOut({ ok: false, error: String(error && error.message ? error.message : error) });
@@ -87,11 +103,35 @@ function parseBody(e) {
   };
 }
 
-function appendToSheet(data) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheetName);
-  if (!sheet) {
-    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(CONFIG.sheetName);
+/**
+ * The script may be standalone (script.google.com → New project), in which case
+ * SpreadsheetApp.getActiveSpreadsheet() returns null. On first use we create a
+ * spreadsheet and remember its id in Script Properties, so later submissions
+ * keep landing in the same file.
+ */
+function getSheet_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('SPREADSHEET_ID') || '';
+  var ss = null;
+
+  if (id) {
+    ss = SpreadsheetApp.openById(id);
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      ss = SpreadsheetApp.create('Ace Bathroom Renovations — enquiries');
+      props.setProperty('SPREADSHEET_ID', ss.getId());
+    }
   }
+
+  var sheet = ss.getSheetByName(CONFIG.sheetName);
+  if (!sheet) sheet = ss.insertSheet(CONFIG.sheetName);
+  return sheet;
+}
+
+function appendToSheet(data) {
+  var sheet = getSheet_();
+
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
       'Received', 'Name', 'Phone', 'Email', 'Suburb', 'Property',

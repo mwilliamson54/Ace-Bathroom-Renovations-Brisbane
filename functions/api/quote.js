@@ -158,7 +158,23 @@ async function sendWebhook(env, data) {
       honeypot: undefined,
     }),
   });
-  if (!res.ok) throw new Error(`Webhook ${res.status}`);
+  const text = await res.text().catch(() => "");
+  if (!res.ok) throw new Error(`Webhook ${res.status}: ${text.slice(0, 200)}`);
+
+  // Google Apps Script always answers 200, even when it rejected the submission
+  // (bad token, mail quota, script error). Treat ok:false as a failed channel so
+  // the form does not report "delivered" for a lead nobody received.
+  if (text) {
+    try {
+      const body = JSON.parse(text);
+      if (body && body.ok === false) {
+        throw new Error(`Webhook rejected: ${String(body.error || "unknown").slice(0, 200)}`);
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) return { sent: true };
+      throw error;
+    }
+  }
   return { sent: true };
 }
 

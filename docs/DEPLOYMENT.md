@@ -84,7 +84,7 @@ In **Workers & Pages → your project → Settings → Environment variables**, 
 | `RESEND_API_KEY` | Secret | For email | Create at <https://resend.com/api-keys>. Never commit it. |
 | `QUOTE_TO_EMAIL` | Plain text | For email | `AceBathroomRenovationsBrisbane@gmail.com` |
 | `QUOTE_FROM_EMAIL` | Plain text | For email | `website@acebathroomrenovationsbrisbane.com` — must be on a domain verified in Resend. Until then, `onboarding@resend.dev` works as an interim sender (owner inbox only). |
-| `QUOTE_WEBHOOK_URL` | Secret (optional) | Optional | HTTPS endpoint that accepts a JSON `POST`. |
+| `QUOTE_WEBHOOK_URL` | Secret (optional) | Optional | HTTPS endpoint that accepts a JSON `POST`, including any token it needs in the query string (e.g. the Gmail relay's `…/exec?token=…`). |
 
 You can configure **email**, **webhook**, or **both**. The Function attempts every configured channel concurrently and succeeds if at least one delivery succeeds.
 
@@ -277,13 +277,39 @@ and every enquiry is also appended to a Google Sheet.
 
 Setup (about five minutes):
 
-1. Open <https://script.google.com> → **New project**.
-2. Replace the contents of `Code.gs` with `integrations/google-apps-script/Code.gs`.
-3. Change `CONFIG.sharedToken` to a long random string. Keep `CONFIG.toEmail` as the Gmail inbox.
-4. **Deploy → New deployment → Web app**. Set *Execute as* = **Me**, *Who has access* = **Anyone**.
-5. Copy the web app URL and append `?token=YOUR_TOKEN`.
-6. Set that full URL as `QUOTE_WEBHOOK_URL` (secret) on the Pages project, then redeploy.
-7. Submit one test through the form and confirm it appears in the inbox **and** in the sheet.
+1. Open <https://script.google.com> → **New project**, name it `Ace quote relay`.
+2. Replace the contents of `Code.gs` with `integrations/google-apps-script/Code.gs` and save.
+3. Change `CONFIG.sharedToken` to a long random string, URL-safe (`A-Z a-z 0-9 - _` only, no
+   `&`, `#`, `+` or spaces — it is pasted into a query string). While it still reads `CHANGE-ME`
+   the script rejects every request, so a half-finished deployment is never an open relay.
+4. Check `CONFIG.toEmail` is the inbox that should receive enquiries.
+5. **Deploy → New deployment → Web app**. Set *Execute as* = **Me**, *Who has access* = **Anyone**.
+   Authorise the script when prompted (Sheets + Gmail scopes).
+6. Copy the web app URL (it ends in `/exec`) and append `?token=YOUR_TOKEN`.
+7. Open that URL in a browser. It should return `{"ok":true,"service":"ace-quote-relay"}` — that
+   confirms the deployment is live before the site depends on it.
+8. Set it as the Pages secret and redeploy (see below).
+9. Submit one test through the form and confirm it arrives in the inbox **and** in the sheet.
+
+The script does not need to be bound to a spreadsheet. On the first enquiry it creates
+`Ace Bathroom Renovations — enquiries`, remembers the file id in Script Properties, and appends one
+row per lead. If the sheet fails, the email is still sent — the response reports
+`"sheet":"failed: …"` so the archive problem is visible rather than silent.
+
+Setting the secret:
+
+```sh
+# Git-integration project (current setup)
+npx wrangler pages secret put QUOTE_WEBHOOK_URL --project-name ace-bathroom-renovations-brisbane
+# paste the full https://script.google.com/macros/s/…/exec?token=… value when prompted
+```
+
+Set it for **both** production and preview, then redeploy — Pages snapshots the environment at
+deploy time, so an existing deployment keeps the old values until a new one is created.
+
+Delivery rules: Resend and the relay are attempted in parallel and the form succeeds if **either**
+delivers. A relay that answers `{"ok":false}` (wrong token, mail quota, script error) counts as a
+failure, not a success, so the visitor is told to phone rather than being shown a false confirmation.
 
 Names, phone numbers and message bodies are deliberately never written to the Worker log stream;
 they are only ever stored in KV, in the Sheet and in the delivered email.
