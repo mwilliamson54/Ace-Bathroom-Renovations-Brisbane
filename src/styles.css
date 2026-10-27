@@ -892,6 +892,19 @@ body.nav-open { overflow: hidden; }
 .hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .form-consent { display: flex; align-items: flex-start; gap: 9px; font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
 .form-consent input { width: 17px; height: 17px; min-height: 0; margin-top: 2px; flex: none; }
+.host-warning {
+  position: relative;
+  z-index: 60;
+  padding: 11px 18px;
+  background: var(--danger);
+  color: var(--white);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  text-align: center;
+}
+.host-warning a { color: var(--white); font-weight: 700; text-decoration: underline; }
+.host-warning a:hover { text-decoration: none; }
+
 .form-status { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius); font-size: 0.86rem; display: none; }
 .form-status.is-visible { display: block; }
 .form-status--error { background: #fdf0ef; border: 1px solid #f0c4bf; color: #8f2f27; }

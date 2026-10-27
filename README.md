@@ -169,6 +169,8 @@ The Function supports three delivery/archive channels, used together when presen
 
 If no channel is configured, the endpoint returns **HTTP 503** with a clear call/email message rather than pretending the enquiry was sent. If delivery fails, it returns **502** with the same fallback. Either way the submission is still archived to KV, so no lead is lost. See `docs/DEPLOYMENT.md` §3.8–3.9 for the relay setup and for reading the archive when an enquiry goes missing.
 
+Because the form posts to a relative path, a page loaded from an old Cloudflare deployment hostname submits to that old deployment's Function, with its old code and old environment variables. `src/app.js` therefore compares `location.host` with the page's canonical URL: on any other hostname it shows a red "archived copy" banner and refuses to submit, pointing at the live site instead.
+
 Set these in **Cloudflare Pages → Settings → Environment variables** for both Production and Preview. See `docs/DEPLOYMENT.md` for the full procedure and Resend domain verification.
 
 ---

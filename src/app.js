@@ -5,6 +5,30 @@
   var $ = function (sel, ctx) { return (ctx || document).querySelector(sel); };
   var $$ = function (sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); };
 
+  /* ---------------- Archived-copy guard ----------------
+     Cloudflare Pages serves every past deployment on its own hostname, and old
+     deployments keep old Function code and old environment variables. A bookmark
+     to one silently breaks the form, so make it obvious and refuse to submit. */
+  var canonicalLink = $('link[rel="canonical"]');
+  var canonicalUrl = null;
+  try {
+    if (canonicalLink) canonicalUrl = new URL(canonicalLink.getAttribute("href"), location.href);
+  } catch (err) {
+    canonicalUrl = null;
+  }
+  var isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  var isArchived = Boolean(canonicalUrl) && !isLocal && canonicalUrl.host !== location.host;
+
+  if (isArchived) {
+    var warning = document.createElement("div");
+    warning.className = "host-warning";
+    warning.setAttribute("role", "alert");
+    warning.innerHTML =
+      'You are viewing an archived copy of this site, where the enquiry form does not work. ' +
+      '<a href="' + canonicalUrl.href + '">Open the live site</a> to send your details.';
+    if (document.body) document.body.insertBefore(warning, document.body.firstChild);
+  }
+
   /* ---------------- Mobile navigation ---------------- */
   var nav = $("#mobile-nav");
   var toggle = $("#nav-toggle");
@@ -178,6 +202,10 @@
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (isArchived) {
+        show("error", 'This is an archived copy of the site, so the form cannot send. Please <a href="' + canonicalUrl.href + '">open the live site</a> and submit again, or call (07) 8590 6941.');
+        return;
+      }
       if (!form.checkValidity()) {
         form.reportValidity();
         return;
