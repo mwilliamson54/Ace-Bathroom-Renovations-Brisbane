@@ -409,7 +409,7 @@ ${renderFooter(path)}
  * Reusable sections
  * ------------------------------------------------------------------ */
 export function hero({
-  image = "/images/hero-bathroom.svg",
+  image = "/images/hero-bathroom.webp",
   alt = "Contemporary bathroom renovation in Brisbane",
   eyebrow,
   h1,

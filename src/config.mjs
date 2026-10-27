@@ -53,8 +53,8 @@ export const site = {
 };
 
 export const images = {
-  hero: "/images/hero-bathroom.svg",
-  heroAlt: "Contemporary Brisbane bathroom with large-format tiling, walk-in shower and timber vanity",
+  hero: "/images/hero-bathroom.webp",
+  heroAlt: "Contemporary Brisbane bathroom renovation with large-format tiling, walk-in shower and timber vanity",
   ensuite: "/images/ensuite.svg",
   small: "/images/small-bathroom.svg",
   laundry: "/images/laundry.svg",
