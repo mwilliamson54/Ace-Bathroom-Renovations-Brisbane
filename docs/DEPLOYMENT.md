@@ -35,7 +35,7 @@ This site is built for **Cloudflare Pages** with a single Pages Function at `fun
 
 ---
 
-## 2. Option A — Git integration (recommended)
+## 2. Option A - Pages Git integration (new projects)
 
 Git integration gives automatic production deploys on push and preview URLs for branches. It also compiles Pages Functions correctly.
 
@@ -158,7 +158,7 @@ Delete test enquiries from the inbox after verification.
 
 ---
 
-## 3. Option B — Wrangler CLI
+## 3. Option B - Wrangler CLI and GitHub Actions (current setup)
 
 Use this if you are deploying from a local machine or a CI runner rather than Git integration.
 
@@ -208,13 +208,39 @@ The generated `_redirects` also omits the `www` → apex rule for `*.pages.dev` 
 custom domain is live, rebuild **without** `SITE_ORIGIN` and redeploy so canonicals return to the
 production domain.
 
-For a preview deployment:
+### 3.5 Automatic deploys on push (configured)
+
+`.github/workflows/deploy.yml` builds, runs the 12-point QA gate and deploys to Cloudflare Pages
+on every push to `main` (and on manual dispatch). A failed check blocks the deploy.
+
+| GitHub setting | Kind | Value |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Secret | API token with **Cloudflare Pages: Edit**. |
+| `CLOUDFLARE_ACCOUNT_ID` | Secret | `060afa736b0beb6094785bec49b76053` |
+| `SITE_ORIGIN` | Variable | The host currently serving the site, e.g. `https://ace-bathroom-renovations-brisbane.pages.dev`. Delete it once the custom domain is attached. |
+
+A normal release is therefore just:
+
+```sh
+git add -A
+git commit -m "Update content"
+git push origin main
+```
+
+**Why GitHub Actions instead of Pages Git integration?** The Pages project was created by Direct
+Upload, and Cloudflare does not allow a Direct Upload project to be converted to a Git-connected
+one (`You cannot update the source object in a Direct Uploads project`). Converting would mean
+installing the Cloudflare Pages GitHub App from the dashboard and creating a second, Git-connected
+project, then moving the custom domain across. Actions deploys to the existing project, so no
+project migration is needed.
+
+### 3.6 Preview deployments
 
 ```sh
 npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane --branch preview
 ```
 
-### 3.4 Set secrets and variables
+### 3.7 Set secrets and variables
 
 ```sh
 npx wrangler pages secret put RESEND_API_KEY --project-name ace-bathroom-renovations-brisbane

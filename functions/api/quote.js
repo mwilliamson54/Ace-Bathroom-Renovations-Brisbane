@@ -118,7 +118,11 @@ async function sendWithResend(env, data) {
 
   const payload = {
     from,
-    to: [to],
+    // Send a plain string (Resend's test-sender restriction rejects a one-item
+    // array) and lower-case it: Resend compares the recipient against the account
+    // owner's address case-sensitively, so a capitalised QUOTE_TO_EMAIL fails
+    // with 403 while the same address in lower case is accepted.
+    to: to.trim().toLowerCase(),
     subject: `Website enquiry: ${data.name} — ${data.suburb}`,
     text: enquiryText(data),
     html: enquiryHtml(data),

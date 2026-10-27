@@ -172,13 +172,29 @@ Set these in **Cloudflare Pages → Settings → Environment variables** for bot
 
 ## Deployment
 
-The site is designed for Cloudflare Pages with Git integration:
+The site runs on Cloudflare Pages. Pushing to `main` deploys automatically via
+`.github/workflows/deploy.yml`, which builds, runs the 12-point QA gate and then publishes with
+Wrangler (so the `functions/` bundle is compiled and uploaded). A failing check blocks the deploy.
 
+- **Live site:** <https://ace-bathroom-renovations-brisbane.pages.dev>
+- **Project:** `ace-bathroom-renovations-brisbane`
 - **Build command:** `npm run build`
 - **Build output directory:** `dist`
 - **Functions directory:** `/functions` at the repository root
+- **Required repository secrets:** `CLOUDFLARE_API_TOKEN` (Pages: Edit), `CLOUDFLARE_ACCOUNT_ID`
+- **Optional repository variable:** `SITE_ORIGIN`, set to the host actually serving the site
 
-> **Important:** Cloudflare's dashboard drag-and-drop Direct Upload does **not** compile a `functions/` folder. Use Git integration or the Wrangler CLI from the repository root. See `docs/DEPLOYMENT.md`.
+To deploy by hand:
+
+```sh
+npm run build
+npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane --branch main
+```
+
+> **Why not Pages Git integration?** The project was created by Direct Upload, which Cloudflare
+> does not allow to be converted to a Git-connected project. GitHub Actions deploys to the same
+> project, so nothing needs migrating. Do **not** upload `dist/` through the dashboard — a
+> drag-and-drop Direct Upload does not compile `functions/`. See `docs/DEPLOYMENT.md`.
 
 The generated `dist/_headers` sets security headers and long-lived caching for fonts and images. `dist/_redirects` handles the `www` canonical redirect and common legacy paths. `dist/_routes.json` limits Function invocation to `/api/*`.
 
