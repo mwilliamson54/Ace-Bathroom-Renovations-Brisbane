@@ -161,6 +161,16 @@ async function sendWebhook(env, data) {
   return { sent: true };
 }
 
+async function record(env, entry) {
+  if (!env || !env.QUOTE_LOG) return;
+  try {
+    const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await env.QUOTE_LOG.put(key, JSON.stringify(entry), { expirationTtl: 60 * 60 * 24 * 90 });
+  } catch (error) {
+    console.error("Quote log write failed:", error && error.message);
+  }
+}
+
 async function handlePost(context) {
   const { request, env } = context;
 
@@ -173,6 +183,12 @@ async function handlePost(context) {
   try {
     form = await request.formData();
   } catch {
+    await record(env, {
+      at: new Date().toISOString(),
+      outcome: "unreadable_body",
+      contentType: request.headers.get("content-type") || "",
+      contentLength: length,
+    });
     return json({ ok: false, message: `We could not read that submission. Please call ${PHONE_DISPLAY}.` }, 400);
   }
 
@@ -192,6 +208,19 @@ async function handlePost(context) {
     consent: data.consent,
   };
 
+  // Every submission is archived to KV before responding, so a lead is never lost
+  // even if delivery fails, and so the exact fields the browser sent can be inspected.
+  const finish = async (response, outcome, extra = {}) => {
+    await record(env, {
+      at: new Date().toISOString(),
+      outcome,
+      ...data,
+      honeypotHit: Boolean(data.honeypot),
+      ...extra,
+    });
+    return response;
+  };
+
   // Honeypot: bots fill hidden fields. Browser autofill occasionally does too, so a
   // submission that otherwise looks like a genuine enquiry is delivered and flagged
   // rather than being silently discarded.
@@ -199,7 +228,7 @@ async function handlePost(context) {
     const genuine = validate(data).length === 0;
     if (!genuine) {
       console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_blocked" }));
-      return json({ ok: true, message: "Thank you." });
+      return finish(json({ ok: true, message: "Thank you." }), "blocked_honeypot");
     }
     console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_flagged" }));
     data.subjectPrefix = "[check honeypot] ";
@@ -208,18 +237,21 @@ async function handlePost(context) {
   const errors = validate(data);
   if (errors.length) {
     console.warn(JSON.stringify({ ...trace, event: "quote_invalid", error: errors[0] }));
-    return json({ ok: false, message: errors[0] }, 422);
+    return finish(json({ ok: false, message: errors[0] }, 422), "invalid", { error: errors[0] });
   }
 
   const configured = Boolean(env.RESEND_API_KEY && env.QUOTE_TO_EMAIL && env.QUOTE_FROM_EMAIL) || Boolean(env.QUOTE_WEBHOOK_URL);
   if (!configured) {
-    return json(
-      {
-        ok: false,
-        message: `The online form is not connected right now. Please call ${PHONE_DISPLAY} or email ${EMAIL} and we will respond personally.`,
-        fallback: { phone: PHONE_DISPLAY, email: EMAIL },
-      },
-      503
+    return finish(
+      json(
+        {
+          ok: false,
+          message: `The online form is not connected right now. Please call ${PHONE_DISPLAY} or email ${EMAIL} and we will respond personally.`,
+          fallback: { phone: PHONE_DISPLAY, email: EMAIL },
+        },
+        503
+      ),
+      "not_configured"
     );
   }
 
@@ -227,25 +259,33 @@ async function handlePost(context) {
   const delivered = results.some((r) => r.status === "fulfilled" && r.value && r.value.sent);
 
   if (!delivered) {
-    for (const result of results) {
-      if (result.status === "rejected") console.error("Quote delivery failed:", result.reason);
-    }
+    const detail = results
+      .filter((r) => r.status === "rejected")
+      .map((r) => String((r.reason && r.reason.message) || r.reason).slice(0, 300));
+    for (const message of detail) console.error("Quote delivery failed:", message);
     console.error(JSON.stringify({ ...trace, event: "quote_undelivered" }));
-    return json(
-      {
-        ok: false,
-        message: `We could not deliver the form from this device. Please call ${PHONE_DISPLAY} or email ${EMAIL} so your enquiry is not delayed.`,
-        fallback: { phone: PHONE_DISPLAY, email: EMAIL },
-      },
-      502
+    return finish(
+      json(
+        {
+          ok: false,
+          message: `We could not deliver the form from this device. Please call ${PHONE_DISPLAY} or email ${EMAIL} so your enquiry is not delayed.`,
+          fallback: { phone: PHONE_DISPLAY, email: EMAIL },
+        },
+        502
+      ),
+      "undelivered",
+      { deliveryError: detail.join(" | ") }
     );
   }
 
   console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
-  return json({
-    ok: true,
-    message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
-  });
+  return finish(
+    json({
+      ok: true,
+      message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
+    }),
+    "delivered"
+  );
 }
 
 async function handleGet() {
