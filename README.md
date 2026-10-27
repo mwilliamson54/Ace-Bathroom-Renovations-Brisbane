@@ -15,7 +15,7 @@ The site is deliberately simple and fast:
 ## Requirements
 
 - Node.js **20 or newer** (see `engines` in `package.json`)
-- npm (only for the scripts; there are no production dependencies)
+- npm (only for the scripts; there are no production dependencies — `sharp` is a dev dependency used solely by the image import script)
 - A Cloudflare account for deployment
 
 ---
@@ -29,6 +29,9 @@ The site is deliberately simple and fast:
 | `npm run serve` / `npm run preview` | Serves `dist/` at <http://localhost:4173>. The form endpoint returns a local-only fallback message. |
 | `npm run test:api` | Tests the quote Function directly: validation, honeypot, unconfigured fallback and mocked delivery. |
 | `npm run meta` | Prints the route, title and meta description for every built page. |
+| `npm run images:import` | Converts everything in `incoming/` to optimised WebP with metadata; see `docs/IMAGE-BRIEF.md`. |
+| `npm run images:list` | Shows the 20 image slots, their target sizes and which are still missing. |
+| `npm run images:report` | Counts `<img>` tags and inline SVG per page and writes `docs/IMAGE-INVENTORY.md`. |
 
 Typical local loop:
 
@@ -100,8 +103,14 @@ tools/
   linkmatrix.mjs           Verifies every non-legal page links to every other
   qa-viewport.mjs          Headless viewport overflow audit
   page-meta.mjs            Metadata dump
+  image-report.mjs         Per-page <img> and inline SVG count
+  import-images.mjs        Crops, converts and tags generated images
+  inspect-image.mjs        Prints dimensions, EXIF and XMP for one image
+incoming/                  Generated sources (git-ignored); output goes to public/images
 docs/
   DEPLOYMENT.md            Cloudflare Pages deployment and form setup
+  IMAGE-BRIEF.md           Prompt, size and alt text for all 20 image slots
+  IMAGE-INVENTORY.md       Where every current image is used
   LOCAL-SEO-COMPLIANCE.md  Criterion-by-criterion checklist report
   KEYWORD-MAP.md           Page-to-keyword map, intent and exclusions
 dist/                      Generated output (not committed)
@@ -133,14 +142,31 @@ Edit **`src/styles.css`**. It is inlined at build time, so there is no separate 
 
 ### Images
 
-All current imagery is **representative SVG placeholder art** in `public/images/`. Replace files with real photography using the same filenames, or update the paths in `src/config.mjs` and the page modules. Preserve:
+All current imagery is **representative SVG placeholder art** in `public/images/`. The plan is to
+replace all 20 content images with photographic WebP, one per slot, keeping the existing filenames.
+`docs/IMAGE-BRIEF.md` holds the prompt, target size and alt text for every slot;
+`docs/IMAGE-INVENTORY.md` lists where each file is currently used.
+
+```sh
+npm install                 # dev-only: sharp, used by the import script
+npm run images:list         # which slots are done
+npm run images:import       # convert everything in incoming/ (see the brief)
+npm run build && npm run check
+```
+
+The import script crops to the slot's aspect ratio, converts to WebP at quality 78, and refuses to
+write a file over 200 KB. When swapping a slot, change the `.svg` reference to `.webp` in `src/`
+and keep:
 
 - explicit `width` and `height` attributes to avoid layout shift;
 - descriptive `alt` text (no keyword stuffing);
-- WebP or AVIF where possible, with a sensible fallback;
-- the Open Graph image at `public/images/og-image.png` (1200×630).
+- the Open Graph image at `public/images/og-image.png` (1200×630) — regenerate it if the hero changes.
 
-Gallery images are labelled as representative illustrations. Do not present them as completed client projects unless you have written permission and can supply the real project details.
+**Metadata policy.** Generated images carry truthful IPTC/XMP: the alt text as the description, the
+business as creator and copyright holder, and `DigitalSourceType = trainedAlgorithmicMedia`. Do not
+write camera make/model or capture dates onto a generated image — presenting an AI render as a
+photograph of a completed job is misleading conduct, and the gallery keeps its "representative
+illustration" caption.
 
 ### Metadata
 

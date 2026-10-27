@@ -33,3 +33,7 @@ desktop.ini
 # Local archives and scratch files
 *.zip
 _archive/
+
+# Generated image sources (drop ChatGPT downloads here; only the WebP output is committed)
+incoming/
+!incoming/.gitkeep
