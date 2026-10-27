@@ -227,6 +227,15 @@ git commit -m "Update content"
 git push origin main
 ```
 
+Token requirements:
+
+- **Cloudflare Pages: Edit** on the account that owns the project, and no other permission is needed.
+- **No Client IP Address Filtering.** GitHub-hosted runners use dynamic egress addresses, so a
+  filtered token fails with `Authentication error [code: 10000]` even though
+  `user/tokens/verify` reports the token as valid and active. The workflow's
+  *Check deploy credentials* step catches this before Wrangler runs.
+- The token must be scoped to the same account as `CLOUDFLARE_ACCOUNT_ID`.
+
 **Why GitHub Actions instead of Pages Git integration?** The Pages project was created by Direct
 Upload, and Cloudflare does not allow a Direct Upload project to be converted to a Git-connected
 one (`You cannot update the source object in a Direct Uploads project`). Converting would mean
