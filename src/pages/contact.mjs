@@ -61,8 +61,8 @@ function quoteForm(source = "quote-page") {
   return `<form class="form-card" id="quote-form" action="/api/quote" method="post" novalidate>
     <input type="hidden" name="source" value="${source}">
     <div class="hp-field" aria-hidden="true">
-      <label for="company-website">Company website</label>
-      <input type="text" id="company-website" name="company_website" tabindex="-1" autocomplete="off">
+      <label for="quote-ax-hp">Leave this field empty</label>
+      <input type="text" id="quote-ax-hp" name="ax_hp" tabindex="-1" autocomplete="off" data-lpignore="true">
     </div>
     <div class="form-grid form-grid--2">
       <div class="field">
@@ -343,8 +343,8 @@ ${trustStrip()}
         <form class="form-card" id="contact-form" action="/api/quote" method="post" novalidate>
           <input type="hidden" name="source" value="contact-page">
           <div class="hp-field" aria-hidden="true">
-            <label for="contact-website">Company website</label>
-            <input type="text" id="contact-website" name="company_website" tabindex="-1" autocomplete="off">
+            <label for="contact-ax-hp">Leave this field empty</label>
+            <input type="text" id="contact-ax-hp" name="ax_hp" tabindex="-1" autocomplete="off" data-lpignore="true">
           </div>
           <div class="form-grid form-grid--2">
             <div class="field">

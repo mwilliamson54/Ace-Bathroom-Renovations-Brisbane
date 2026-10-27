@@ -53,7 +53,7 @@ function fieldsFrom(form) {
     message: get("message", 2000),
     source: get("source", 60),
     consent: form.get("consent") === "yes" || form.get("consent") === "on",
-    honeypot: get("company_website", 200),
+    honeypot: get("ax_hp", 200) || get("company_website", 200),
   };
 }
 
@@ -178,11 +178,29 @@ async function handlePost(context) {
 
   const data = fieldsFrom(form);
 
+  // Diagnostic trail. Deliberately logs no names, phone numbers, emails or message
+  // bodies: only field presence and the delivery outcome.
+  const trace = {
+    event: "quote_received",
+    source: data.source || "website",
+    fields: Object.keys(Object.fromEntries(form.entries())).length,
+    hasName: data.name.length > 0,
+    hasPhone: data.phone.length > 0,
+    hasSuburb: data.suburb.length > 0,
+    hasMessage: data.message.length > 0,
+    honeypotHit: Boolean(data.honeypot),
+    consent: data.consent,
+  };
+
   // Honeypot: silently accept so bots do not learn the rule.
-  if (data.honeypot) return json({ ok: true, message: "Thank you." });
+  if (data.honeypot) {
+    console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_blocked" }));
+    return json({ ok: true, message: "Thank you." });
+  }
 
   const errors = validate(data);
   if (errors.length) {
+    console.warn(JSON.stringify({ ...trace, event: "quote_invalid", error: errors[0] }));
     return json({ ok: false, message: errors[0] }, 422);
   }
 
@@ -205,6 +223,7 @@ async function handlePost(context) {
     for (const result of results) {
       if (result.status === "rejected") console.error("Quote delivery failed:", result.reason);
     }
+    console.error(JSON.stringify({ ...trace, event: "quote_undelivered" }));
     return json(
       {
         ok: false,
@@ -215,6 +234,7 @@ async function handlePost(context) {
     );
   }
 
+  console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
   return json({
     ok: true,
     message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
