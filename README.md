@@ -150,7 +150,7 @@ Each page exports `title` and `description`. Keep titles at or below 60 characte
 
 Both forms submit `multipart/form-data` to `POST /api/quote` with:
 
-- a hidden honeypot field named `company_website`;
+- a hidden honeypot field named `ax_hp` (renamed from `company_website` because browser autofill was filling the old name, which silently discarded genuine enquiries);
 - shared status output in `#quote-status`;
 - client-side validation plus server-side validation;
 - a phone/email fallback if delivery is not configured.

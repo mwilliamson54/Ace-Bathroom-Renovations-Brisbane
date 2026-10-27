@@ -152,7 +152,7 @@ Then submit a real test through the quote form and confirm:
 - the browser shows the success message;
 - the email arrives at `QUOTE_TO_EMAIL`;
 - replying to the email addresses the enquirer;
-- a second test with `company_website` filled in is silently accepted (honeypot) and does **not** send an email.
+- a second test with `ax_hp` filled in and the rest of the form valid is delivered and flagged `[check honeypot]`; filled in with an invalid form it is silently accepted and does **not** send an email.
 
 Delete test enquiries from the inbox after verification.
 

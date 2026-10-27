@@ -123,7 +123,7 @@ async function sendWithResend(env, data) {
     // owner's address case-sensitively, so a capitalised QUOTE_TO_EMAIL fails
     // with 403 while the same address in lower case is accepted.
     to: to.trim().toLowerCase(),
-    subject: `Website enquiry: ${data.name} — ${data.suburb}`,
+    subject: `${data.subjectPrefix || ""}Website enquiry: ${data.name} — ${data.suburb}`,
     text: enquiryText(data),
     html: enquiryHtml(data),
   };
@@ -192,10 +192,17 @@ async function handlePost(context) {
     consent: data.consent,
   };
 
-  // Honeypot: silently accept so bots do not learn the rule.
+  // Honeypot: bots fill hidden fields. Browser autofill occasionally does too, so a
+  // submission that otherwise looks like a genuine enquiry is delivered and flagged
+  // rather than being silently discarded.
   if (data.honeypot) {
-    console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_blocked" }));
-    return json({ ok: true, message: "Thank you." });
+    const genuine = validate(data).length === 0;
+    if (!genuine) {
+      console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_blocked" }));
+      return json({ ok: true, message: "Thank you." });
+    }
+    console.warn(JSON.stringify({ ...trace, event: "quote_honeypot_flagged" }));
+    data.subjectPrefix = "[check honeypot] ";
   }
 
   const errors = validate(data);
