@@ -4,6 +4,11 @@ Every image currently on the site is an SVG placeholder. This brief replaces all
 photographic WebP files, one per slot, using the existing filenames so the templates only need
 their extension changed.
 
+> **Status (27 Oct 2026): all 20 slots are complete.** Each image was generated in the owner's
+> ChatGPT session, downloaded at 1536×1024, cropped and converted by `tools/import-images.mjs`,
+> then wired into `src/config.mjs` and `src/data/services.mjs`. The SVG placeholders have been
+> deleted. Keep this brief as the spec for replacements or new slots.
+
 ## House style (applies to every prompt)
 
 Append to each prompt:

@@ -31,7 +31,9 @@ The site is deliberately simple and fast:
 | `npm run meta` | Prints the route, title and meta description for every built page. |
 | `npm run images:import` | Converts everything in `incoming/` to optimised WebP with metadata; see `docs/IMAGE-BRIEF.md`. |
 | `npm run images:list` | Shows the 20 image slots, their target sizes and which are still missing. |
+| `npm run images:sheet` | Builds a labelled review sheet of every slot at `incoming/_contact-sheet.webp`. |
 | `npm run images:report` | Counts `<img>` tags and inline SVG per page and writes `docs/IMAGE-INVENTORY.md`. |
+| `npm run make:og` | Rebuilds `public/images/og-image.png` (1200×630) from the hero image. |
 
 Typical local loop:
 
@@ -106,6 +108,8 @@ tools/
   image-report.mjs         Per-page <img> and inline SVG count
   import-images.mjs        Crops, converts and tags generated images
   inspect-image.mjs        Prints dimensions, EXIF and XMP for one image
+  contact-sheet.mjs        Labelled review sheet of the imported slots
+  make-og.mjs              Builds the Open Graph card from the hero image
 incoming/                  Generated sources (git-ignored); output goes to public/images
 docs/
   DEPLOYMENT.md            Cloudflare Pages deployment and form setup
@@ -142,31 +146,33 @@ Edit **`src/styles.css`**. It is inlined at build time, so there is no separate 
 
 ### Images
 
-All current imagery is **representative SVG placeholder art** in `public/images/`. The plan is to
-replace all 20 content images with photographic WebP, one per slot, keeping the existing filenames.
-`docs/IMAGE-BRIEF.md` holds the prompt, target size and alt text for every slot;
-`docs/IMAGE-INVENTORY.md` lists where each file is currently used.
+All 20 content images are **photographic WebP** in `public/images/`, one file per slot, shared across
+95 `<img>` placements. `docs/IMAGE-BRIEF.md` holds the prompt, target size and alt text for every
+slot; `docs/IMAGE-INVENTORY.md` lists where each file is used.
 
 ```sh
-npm install                 # dev-only: sharp, used by the import script
-npm run images:list         # which slots are done
+npm install                 # dev-only: sharp, used by the image tooling
+npm run images:list         # slot sizes and which files exist
 npm run images:import       # convert everything in incoming/ (see the brief)
+node tools/contact-sheet.mjs --all   # review sheet at incoming/_contact-sheet.webp
+npm run make:og             # rebuild og-image.png from the hero
 npm run build && npm run check
 ```
 
 The import script crops to the slot's aspect ratio, converts to WebP at quality 78, and refuses to
-write a file over 200 KB. When swapping a slot, change the `.svg` reference to `.webp` in `src/`
-and keep:
+write a file over 200 KB. Keep:
 
 - explicit `width` and `height` attributes to avoid layout shift;
 - descriptive `alt` text (no keyword stuffing);
-- the Open Graph image at `public/images/og-image.png` (1200×630) — regenerate it if the hero changes.
+- the Open Graph image at `public/images/og-image.png` (1200×630) — regenerate it with
+  `npm run make:og` if the hero changes.
 
 **Metadata policy.** Generated images carry truthful IPTC/XMP: the alt text as the description, the
 business as creator and copyright holder, and `DigitalSourceType = trainedAlgorithmicMedia`. Do not
 write camera make/model or capture dates onto a generated image — presenting an AI render as a
 photograph of a completed job is misleading conduct, and the gallery keeps its "representative
-illustration" caption.
+illustration" caption. Replace a slot with real project photography as soon as it exists; the
+pipeline is identical apart from the provenance fields.
 
 ### Metadata
 

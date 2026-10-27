@@ -8,7 +8,7 @@ export const services = [
     description:
       "Complete bathroom renovations in Brisbane by a QBCC licensed builder. Strip-out, waterproofing, tiling, plumbing and fit-off by one team. Call (07) 8590 6941.",
     eyebrow: "Complete wet-area rebuilds",
-    image: "/images/full-bathroom.svg",
+    image: "/images/full-bathroom.webp",
     imageAlt: "Full bathroom renovation with walk-in shower, freestanding bath and large-format tiles",
     priceFrom: "$18,000",
     intro: [
@@ -77,7 +77,7 @@ export const services = [
     description:
       "Small and compact bathroom renovations in Brisbane. Clever layouts, storage and light for 3–5 sqm rooms. QBCC licensed. Call (07) 8590 6941.",
     eyebrow: "Making every square metre work",
-    image: "/images/small-bathroom.svg",
+    image: "/images/small-bathroom.webp",
     imageAlt: "Compact bathroom with wall-hung vanity, walk-in shower and light tiles",
     priceFrom: "$14,000",
     intro: [
@@ -146,7 +146,7 @@ export const services = [
     description:
       "Ensuite renovations in Brisbane designed for privacy, storage and low maintenance. QBCC licensed, full waterproofing and fixed quotes. Call (07) 8590 6941.",
     eyebrow: "Private, practical, low-maintenance",
-    image: "/images/ensuite.svg",
+    image: "/images/ensuite.webp",
     imageAlt: "Ensuite renovation with double basin vanity, large mirror and walk-in shower",
     priceFrom: "$15,000",
     intro: [
@@ -215,7 +215,7 @@ export const services = [
     description:
       "Laundry renovations in Brisbane with smart storage, durable wet-area finishes and coordinated plumbing. QBCC licensed builder. Call (07) 8590 6941.",
     eyebrow: "Hard-working utility spaces",
-    image: "/images/laundry.svg",
+    image: "/images/laundry.webp",
     imageAlt: "Laundry renovation with built-in cabinetry, stone bench and subway tiles",
     priceFrom: "$10,000",
     intro: [
@@ -284,7 +284,7 @@ export const services = [
     description:
       "Kitchen renovations in Brisbane by a QBCC licensed builder. Cabinetry, stone, tiling and plumbing coordinated from design to fit-off. Call (07) 8590 6941.",
     eyebrow: "Kitchens built around real routines",
-    image: "/images/kitchen.svg",
+    image: "/images/kitchen.webp",
     imageAlt: "Modern kitchen with island bench, stone benchtop and tiled splashback",
     priceFrom: "$22,000",
     intro: [
@@ -353,7 +353,7 @@ export const services = [
     description:
       "Bathroom waterproofing in Brisbane to AS 3740, with flood testing, documented application and compliance certificates. Call (07) 8590 6941.",
     eyebrow: "The layer you never see",
-    image: "/images/waterproofing.svg",
+    image: "/images/waterproofing.webp",
     imageAlt: "Waterproofing membrane being applied to a bathroom floor and wall junction",
     priceFrom: "$2,500",
     intro: [
@@ -422,7 +422,7 @@ export const services = [
     description:
       "Bathroom tiling in Brisbane by a licensed tiler with Certificate III in Wall and Floor Tiling. Large format, mitred edges, niches. Call (07) 8590 6941.",
     eyebrow: "Precision set-out, clean lines",
-    image: "/images/tiling.svg",
+    image: "/images/tiling.webp",
     imageAlt: "Bathroom tiling with large-format wall tiles and a mitred niche",
     priceFrom: "$3,500",
     intro: [
@@ -491,7 +491,7 @@ export const services = [
     description:
       "Accessible bathroom modifications in Brisbane: step-free showers, grab rails, wider clearances and slip-resistant finishes. QBCC licensed. Call (07) 8590 6941.",
     eyebrow: "Safe, dignified, independent",
-    image: "/images/accessible.svg",
+    image: "/images/accessible.webp",
     imageAlt: "Accessible bathroom with step-free shower, grab rail and wall-hung basin",
     priceFrom: "$16,000",
     intro: [
@@ -560,7 +560,7 @@ export const services = [
     description:
       "Apartment and body corporate bathroom renovations in Brisbane. Approval documentation, quiet work practices and lift access planning. Call (07) 8590 6941.",
     eyebrow: "Approvals, access and quiet delivery",
-    image: "/images/apartment.svg",
+    image: "/images/apartment.webp",
     imageAlt: "Apartment bathroom with compact vanity, frameless shower and warm lighting",
     priceFrom: "$17,000",
     intro: [
@@ -629,7 +629,7 @@ export const services = [
     description:
       "Bathroom and kitchen renovations for Brisbane Queenslander homes. Character detailing, VJ walls and modern waterproofing. Call (07) 8590 6941.",
     eyebrow: "Modern comfort, character retained",
-    image: "/images/queenslander.svg",
+    image: "/images/queenslander.webp",
     imageAlt: "Queenslander bathroom with VJ walls, timber vanity and classic tapware",
     priceFrom: "$19,000",
     intro: [
@@ -698,7 +698,7 @@ export const services = [
     description:
       "Commercial bathroom renovations in Brisbane for offices, cafes and retail. After-hours work, durable finishes and compliance documentation. Call (07) 8590 6941.",
     eyebrow: "Built for traffic and compliance",
-    image: "/images/commercial.svg",
+    image: "/images/commercial.webp",
     imageAlt: "Commercial bathroom with durable tiling, touch-free tapware and accessible cubicle",
     priceFrom: "$18,000",
     intro: [
