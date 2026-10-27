@@ -88,6 +88,8 @@ src/
     legal.mjs              Privacy, terms and 404
 functions/
   api/quote.js             Cloudflare Pages Function for the quote/contact forms
+integrations/
+  google-apps-script/      Gmail relay: emails enquiries from your own Google account
 public/
   fonts/                   Self-hosted Inter and Jost woff2 files
   images/                  SVG placeholders, logo, favicons and Open Graph image
@@ -155,16 +157,17 @@ Both forms submit `multipart/form-data` to `POST /api/quote` with:
 - client-side validation plus server-side validation;
 - a phone/email fallback if delivery is not configured.
 
-The Function supports two delivery channels, used together when both are present:
+The Function supports three delivery/archive channels, used together when present:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `RESEND_API_KEY` | For email | Resend API key. |
 | `QUOTE_TO_EMAIL` | For email | Destination inbox, e.g. `AceBathroomRenovationsBrisbane@gmail.com`. |
-| `QUOTE_FROM_EMAIL` | For email | Verified sender on your Resend domain, e.g. `website@acebathroomrenovationsbrisbane.com`. Until that domain is verified, `onboarding@resend.dev` works but only delivers to the Resend account owner's inbox. |
-| `QUOTE_WEBHOOK_URL` | Optional | JSON webhook for Slack, Notion, Zapier or a CRM. |
+| `QUOTE_FROM_EMAIL` | For email | Verified sender on your Resend domain, e.g. `website@acebathroomrenovationsbrisbane.com`. Until that domain is verified, `onboarding@resend.dev` works but only delivers to the Resend account owner's inbox, and Gmail often spam-filters it. |
+| `QUOTE_WEBHOOK_URL` | Optional | JSON webhook. Point it at the Gmail relay in `integrations/google-apps-script/` to have enquiries emailed from your own Google account, which avoids the shared test-sender reputation problem entirely. |
+| `QUOTE_LOG` | Recommended | KV binding. Every submission is archived for 90 days with its outcome, the fields received, the request's user agent, and the Resend message id. |
 
-If no channel is configured, the endpoint returns **HTTP 503** with a clear call/email message rather than pretending the enquiry was sent. If delivery fails, it returns **502** with the same fallback. Submissions are not stored in a database.
+If no channel is configured, the endpoint returns **HTTP 503** with a clear call/email message rather than pretending the enquiry was sent. If delivery fails, it returns **502** with the same fallback. Either way the submission is still archived to KV, so no lead is lost. See `docs/DEPLOYMENT.md` §3.8–3.9 for the relay setup and for reading the archive when an enquiry goes missing.
 
 Set these in **Cloudflare Pages → Settings → Environment variables** for both Production and Preview. See `docs/DEPLOYMENT.md` for the full procedure and Resend domain verification.
 

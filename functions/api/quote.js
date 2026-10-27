@@ -141,7 +141,8 @@ async function sendWithResend(env, data) {
     const detail = await res.text().catch(() => "");
     throw new Error(`Resend ${res.status}: ${detail.slice(0, 300)}`);
   }
-  return { sent: true };
+  const body = await res.json().catch(() => ({}));
+  return { sent: true, id: body && body.id ? String(body.id) : "" };
 }
 
 async function sendWebhook(env, data) {
@@ -216,6 +217,10 @@ async function handlePost(context) {
       outcome,
       ...data,
       honeypotHit: Boolean(data.honeypot),
+      // Enough request metadata to tell one visitor's browser from a script test.
+      ua: clean(request.headers.get("user-agent"), 160),
+      referer: clean(request.headers.get("referer"), 160),
+      country: (request.cf && request.cf.country) || "",
       ...extra,
     });
     return response;
@@ -279,12 +284,16 @@ async function handlePost(context) {
   }
 
   console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
+  const resendId = results
+    .map((r) => (r.status === "fulfilled" && r.value && r.value.id) || "")
+    .find(Boolean) || "";
   return finish(
     json({
       ok: true,
       message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
     }),
-    "delivered"
+    "delivered",
+    { resendId }
   );
 }
 

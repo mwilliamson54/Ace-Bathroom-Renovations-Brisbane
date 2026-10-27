@@ -260,6 +260,62 @@ Add `QUOTE_TO_EMAIL` and `QUOTE_FROM_EMAIL` in the dashboard under **Settings �
 
 The custom domain and Resend verification steps are the same as Option A.
 
+### 3.8 Gmail relay (Google Apps Script)
+
+The form posts to `/api/quote`, which delivers in parallel to every configured channel:
+
+| Channel | Env var | Notes |
+| --- | --- | --- |
+| Resend | `RESEND_API_KEY`, `QUOTE_TO_EMAIL`, `QUOTE_FROM_EMAIL` | Works immediately, but on `onboarding@resend.dev` the shared test domain is often spam-filtered by Gmail. |
+| JSON webhook | `QUOTE_WEBHOOK_URL` | Generic; any endpoint that accepts the enquiry as JSON. |
+| KV archive | `QUOTE_LOG` (KV binding) | Every submission is stored for 90 days with its outcome and, on success, the Resend message id. |
+
+Until a domain is verified in Resend, the reliable route is the Gmail relay in
+`integrations/google-apps-script/Code.gs`. It runs inside the business's own Google account, so
+enquiries arrive as ordinary mail from that account with no third-party sender reputation involved,
+and every enquiry is also appended to a Google Sheet.
+
+Setup (about five minutes):
+
+1. Open <https://script.google.com> → **New project**.
+2. Replace the contents of `Code.gs` with `integrations/google-apps-script/Code.gs`.
+3. Change `CONFIG.sharedToken` to a long random string. Keep `CONFIG.toEmail` as the Gmail inbox.
+4. **Deploy → New deployment → Web app**. Set *Execute as* = **Me**, *Who has access* = **Anyone**.
+5. Copy the web app URL and append `?token=YOUR_TOKEN`.
+6. Set that full URL as `QUOTE_WEBHOOK_URL` (secret) on the Pages project, then redeploy.
+7. Submit one test through the form and confirm it appears in the inbox **and** in the sheet.
+
+Names, phone numbers and message bodies are deliberately never written to the Worker log stream;
+they are only ever stored in KV, in the Sheet and in the delivered email.
+
+### 3.9 Diagnosing a missing enquiry
+
+Read the KV archive rather than guessing. Every submission is stored with its outcome:
+
+```sh
+# list archived submissions (most recent last)
+curl -s -H "Authorization: Bearer $CF_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces/$KV_ID/keys?limit=100"
+
+# read one
+curl -s -H "Authorization: Bearer $CF_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces/$KV_ID/values/$KEY"
+```
+
+| `outcome` | Meaning |
+| --- | --- |
+| `delivered` | A channel accepted it. `resendId` identifies the message in the Resend dashboard. |
+| `invalid` | Failed validation; `error` names the field. |
+| `blocked_honeypot` | Honeypot filled *and* the form was otherwise invalid; silently accepted. |
+| `undelivered` | No channel accepted it; `deliveryError` holds the provider's reason. |
+| `not_configured` | No delivery channel env vars are set. |
+| `unreadable_body` | The request body was not valid form data. |
+
+The record also carries `ua`, `referer` and `country`, which is enough to tell a visitor's browser
+from a scripted test. If a visitor reports a missing email and no record exists, the request never
+reached the Function and the cause is client-side (JavaScript error, stale cached page, or a form
+posted from a preview server such as `localhost:4173`, which has no Function).
+
 ---
 
 ## 4. What gets deployed
