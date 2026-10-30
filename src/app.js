@@ -259,6 +259,58 @@
     });
   }
 
+  /* ---------------- Remove any injected preview/archive banners ---------------- */
+  try {
+    var killBanners = function() {
+      try {
+        var nodes = document.querySelectorAll('body *');
+        for (var i = 0; i < nodes.length; i++) {
+          var b = nodes[i];
+          if (!b || !b.textContent) continue;
+          var txt = b.textContent;
+          if (/You are viewing an archived copy|archived copy of this site|preview deployment|open the live site to send|pages\.dev/i.test(txt)) {
+            // Remove if it's a fixed/sticky bar or top-level banner
+            try {
+              var style = window.getComputedStyle ? window.getComputedStyle(b) : null;
+              if (style && (style.position === 'fixed' || style.position === 'sticky')) {
+                if (b.parentNode) { b.parentNode.removeChild(b); continue; }
+              }
+            } catch(e) {}
+            if (b.parentNode === document.body) {
+              var rect = b.getBoundingClientRect ? b.getBoundingClientRect() : null;
+              if (rect && rect.top < 200) {
+                if (b.parentNode) { b.parentNode.removeChild(b); continue; }
+              }
+            }
+            if (b.offsetHeight && b.offsetHeight < 200 && /archived|live site|preview/i.test(txt)) {
+              if (b.parentNode) { b.parentNode.removeChild(b); continue; }
+            }
+          }
+        }
+        // Also check body children
+        var bodyKids = document.body ? document.body.children : [];
+        for (var j = 0; j < bodyKids.length; j++) {
+          var k = bodyKids[j];
+          if (k && k.textContent && /archived copy|You are viewing an archived|open the live site/i.test(k.textContent)) {
+            if (k.offsetHeight < 250) { k.parentNode && k.parentNode.removeChild(k); }
+          }
+        }
+      } catch(e) {}
+    };
+    killBanners();
+    setTimeout(killBanners, 50);
+    setTimeout(killBanners, 150);
+    setTimeout(killBanners, 500);
+    setTimeout(killBanners, 1000);
+    setTimeout(killBanners, 2000);
+    if (typeof MutationObserver !== 'undefined') {
+      try {
+        var mo = new MutationObserver(function(){ killBanners(); });
+        mo.observe(document.documentElement, {childList:true, subtree:true, attributes:true});
+      } catch(e) {}
+    }
+  } catch (e) {}
+
   /* ---------------- Quote / contact forms ---------------- */
   $$('form[action="/api/quote"]').forEach(function (form) {
     var status = $("#quote-status");
