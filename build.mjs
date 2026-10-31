@@ -177,42 +177,65 @@ await writeFile(path.join(DIST, "robots.txt"), robots, "utf8");
 /* ------------------------------------------------------------------ *
  * llms.txt
  * ------------------------------------------------------------------ */
+const SITE_DOMAIN_LLM = (process.env.CUSTOM_DOMAIN || process.env.SITE_DOMAIN || "https://acebathroomrenovationsbrisbane.com").replace(/\/+$/, "");
 const llms = `# ${site.name}
 
 > QBCC licensed bathroom and kitchen renovation builder serving Greater Brisbane, Queensland, Australia. One team for design, demolition, waterproofing, tiling, plumbing coordination and fit-off.
 
-## Contact
+## Business Information
+- Name: Ace Bathroom Renovations Brisbane
+- Legal Name: Ace Bathroom Renovations Brisbane
+- Type: Local Business / HomeAndConstructionBusiness
+- Licence: QBCC Licence ${site.licence.number} — Builder Restricted to Kitchen, Bathroom and Laundry (Kitchen, Bathroom and Laundry)
+- Service Area: Greater Brisbane, within approximately 35 km of Brisbane CBD
+- Address: ${site.address.display}
 - Phone: ${site.phoneDisplay} (${site.phoneIntl})
 - Email: ${site.email}
 - Hours: ${site.hoursLong}
-- Service area: ${site.serviceRadius}
-- Mobile service: we work at client properties across Greater Brisbane; site visits by appointment
-- Licence: QBCC Licence ${site.licence.number} — Builder Restricted to Kitchen, Bathroom and Laundry. Verification details are published on ${site.domain}/about/.
+- Website: ${SITE_DOMAIN_LLM}/
 
-## Core pages
-- Home: ${site.domain}/
-- About and licence verification: ${site.domain}/about/
-- Services: ${site.domain}/services/
-- Locations: ${site.domain}/locations/
-- Cost guide: ${site.domain}/cost-guide/
-- Cost calculator: ${site.domain}/bathroom-renovation-cost-calculator/
-- Quote request: ${site.domain}/get-a-quote/
-- Contact: ${site.domain}/contact/
-- FAQs: ${site.domain}/faqs/
-- Warranty and certificates: ${site.domain}/warranty-and-certificates/
-- Waterproofing quality: ${site.domain}/quality/waterproofing/
+## Core Pages
+- Home: ${SITE_DOMAIN_LLM}/
+- About & Licence Verification: ${SITE_DOMAIN_LLM}/about/
+- Services: ${SITE_DOMAIN_LLM}/services/
+- Locations: ${SITE_DOMAIN_LLM}/locations/
+- Cost Guide: ${SITE_DOMAIN_LLM}/cost-guide/
+- Bathroom Renovation Cost Calculator: ${SITE_DOMAIN_LLM}/bathroom-renovation-cost-calculator/
+- Get a Quote: ${SITE_DOMAIN_LLM}/get-a-quote/
+- Contact: ${SITE_DOMAIN_LLM}/contact/
+- FAQs: ${SITE_DOMAIN_LLM}/faqs/
+- Gallery: ${SITE_DOMAIN_LLM}/gallery/
+- Warranty & Certificates: ${SITE_DOMAIN_LLM}/warranty-and-certificates/
+- Waterproofing Quality: ${SITE_DOMAIN_LLM}/quality/waterproofing/
 
 ## Services
-${services.map((s) => `- ${s.name}: ${site.domain}/services/${s.slug}/`).join("\n")}
+${services.map((s) => `- ${s.name}: ${SITE_DOMAIN_LLM}/services/${s.slug}/`).join("\n")}
 
-## Suburbs served
-${locations.map((l) => `- ${l.suburb}: ${site.domain}/${l.slug}/`).join("\n")}
+## Suburbs Served
+${locations.map((l) => `- ${l.suburb}: ${SITE_DOMAIN_LLM}/${l.slug}/`).join("\n")}
 
-## Editorial notes
+## Key Offerings
+- Bathroom renovations (full, ensuite, small/compact)
+- Kitchen renovations
+- Laundry renovations
+- Waterproofing (AS 3740 compliant)
+- Tiling (wall and floor)
+- Accessible bathroom modifications
+- Design assistance, tile selection, project management
+- Written fixed-scope quotes and variations agreed in writing
+- Workmanship warranty and waterproofing certificate
+
+## Pricing Guidance
+- Full bathroom renovation: $18,000–$32,000 (indicative planning range; site measure required)
+- Ensuites/small bathrooms: from lower ranges depending on scope/finish
+- All figures are indicative planning ranges, not quotes
+
+## Editorial Notes
 - Cost figures are indicative planning ranges, not quotes.
-- Client reviews are not fabricated. Referee details are available on request.
+- Client reviews are not fabricated; referee details available on request.
 - Gallery images are representative illustrations until client photography is approved.
-- The business is mobile and works at client properties; the postal address is published on the About page.
+- Business is mobile and works at client properties across Greater Brisbane.
+- Canonical domain: ${SITE_DOMAIN_LLM}
 `;
 await writeFile(path.join(DIST, "llms.txt"), llms, "utf8");
 
