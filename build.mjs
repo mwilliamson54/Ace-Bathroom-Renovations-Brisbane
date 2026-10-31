@@ -246,6 +246,7 @@ const headers = `/*
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   Cross-Origin-Opener-Policy: same-origin
+  X-Robots-Tag: index, follow
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
