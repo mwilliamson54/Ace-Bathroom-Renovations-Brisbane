@@ -309,7 +309,7 @@ const redirects = `# Canonical host redirects
 /privacy/ /privacy-policy/ 301
 /terms/ /terms-of-service/ 301
 `;
-await writeFile(path.join(DIST, "_redirects"), redirects, "utf8");
+
 
 /* ------------------------------------------------------------------ *
  * Cloudflare Pages routing config
@@ -319,6 +319,5 @@ const routes = {
   include: ["/api/*"],
   exclude: [],
 };
-await writeFile(path.join(DIST, "_routes.json"), JSON.stringify(routes, null, 2), "utf8");
 
 console.log(`Built ${pages.length} pages + 404 to ${path.relative(ROOT, DIST)}`);
