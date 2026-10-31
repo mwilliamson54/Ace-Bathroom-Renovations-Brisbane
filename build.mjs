@@ -295,13 +295,10 @@ const headers = `/*
 `;
 await writeFile(path.join(DIST, "_headers"), headers, "utf8");
 
-const canonicalHost = site.domain.replace(/^https:\/\//, "");
-const wwwRedirect = canonicalHost.endsWith(".pages.dev")
-  ? "# www -> apex redirect is generated once the production domain is attached"
-  : `https://www.${canonicalHost}/* https://${canonicalHost}/:splat 301!`;
-
-const redirects = `# Canonical host and common legacy paths
-${wwwRedirect}
+const canonicalHost = "acebathroomrenovationsbrisbane.com";
+const redirects = `# Canonical host redirects
+https://www.${canonicalHost}/* https://${canonicalHost}/:splat 301!
+https://*.pages.dev/* https://${canonicalHost}/:splat 301!
 
 # Common misspellings / variants
 /services/full-bathroom-renovations/ /services/full-bathroom-renovation/ 301
