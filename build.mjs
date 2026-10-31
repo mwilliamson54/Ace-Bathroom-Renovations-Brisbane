@@ -174,91 +174,157 @@ Host: ${DOMAIN_HOST}
 `;
 await writeFile(path.join(DIST, "robots.txt"), robots, "utf8");
 
+
 /* ------------------------------------------------------------------ *
  * llms.txt
+ * AI-readable business information and website resource directory
  * ------------------------------------------------------------------ */
-const SITE_DOMAIN_LLM = (process.env.CUSTOM_DOMAIN || process.env.SITE_DOMAIN || "https://acebathroomrenovationsbrisbane.com").replace(/\/+$/, "");
+
+const SITE_DOMAIN_LLM = (
+  process.env.CUSTOM_DOMAIN ||
+  process.env.SITE_DOMAIN ||
+  "https://acebathroomrenovationsbrisbane.com"
+).replace(/\/+$/, "");
+
+// Ensure generated URLs use the canonical domain.
+const llmsUrl = (pathname = "") =>
+  `${SITE_DOMAIN_LLM}/${pathname.replace(/^\/+|\/+$/g, "")}`.replace(/\/$/, (match, offset, string) =>
+    string.endsWith("://") ? match : ""
+  );
+
+// Format dynamic services as Markdown links.
+const llmsServices = services
+  .map((s) => {
+    const url = llmsUrl(`services/${s.slug}/`);
+    return `- [${s.name}](${url}): Professional ${s.name.toLowerCase()} services in Greater Brisbane.`;
+  })
+  .join("\n");
+
+// Format dynamic suburbs as Markdown links.
+const llmsLocations = locations
+  .map((l) => {
+    const url = llmsUrl(`${l.slug}/`);
+    return `- [Bathroom Renovations ${l.suburb}](${url}): Bathroom renovation services in ${l.suburb}, Brisbane.`;
+  })
+  .join("\n");
+
+// Complete llms.txt content.
 const llms = `# ${site.name}
 
-> QBCC licensed bathroom and kitchen renovation builder serving Greater Brisbane, Queensland, Australia. One team for design, demolition, waterproofing, tiling, plumbing coordination and fit-off.
+> Ace Bathroom Renovations Brisbane is a QBCC-licensed bathroom and kitchen renovation builder serving Greater Brisbane, Queensland, Australia. The business provides bathroom renovations, kitchen renovations, laundry renovations, waterproofing, tiling, design assistance, demolition coordination, plumbing coordination and project management.
 
-## Business Information
-- Name: Ace Bathroom Renovations Brisbane
+## Business Overview
+
+- Business Name: Ace Bathroom Renovations Brisbane
 - Legal Name: Ace Bathroom Renovations Brisbane
-- Type: Local Business / HomeAndConstructionBusiness
-- Licence: QBCC Licence ${site.licence.number} — Builder Restricted to Kitchen, Bathroom and Laundry (Kitchen, Bathroom and Laundry)
-- Service Area: Greater Brisbane, within approximately 35 km of Brisbane CBD
-- Address: ${site.address.display}
-- Phone: ${site.phoneDisplay} (${site.phoneIntl})
+- Business Type: Local Business / HomeAndConstructionBusiness
+- QBCC Licence: ${site.licence.number} — Builder Restricted to Kitchen, Bathroom and Laundry
+- Primary Service Area: Greater Brisbane, Queensland, Australia
+- Service Radius: Approximately 35 km from Brisbane CBD
+- Business Address: ${site.address.display}
+- Phone: ${site.phoneDisplay}
+- International Phone: ${site.phoneIntl}
 - Email: ${site.email}
-- Hours: ${site.hoursLong}
+- Operating Hours: ${site.hoursLong}
 - Website: ${SITE_DOMAIN_LLM}/
+- Canonical Domain: ${SITE_DOMAIN_LLM}
 
-## Core Pages
-- Home: ${SITE_DOMAIN_LLM}/
-- About & Licence Verification: ${SITE_DOMAIN_LLM}/about/
-- Services: ${SITE_DOMAIN_LLM}/services/
-- Locations: ${SITE_DOMAIN_LLM}/locations/
-- Cost Guide: ${SITE_DOMAIN_LLM}/cost-guide/
-- Bathroom Renovation Cost Calculator: ${SITE_DOMAIN_LLM}/bathroom-renovation-cost-calculator/
-- Get a Quote: ${SITE_DOMAIN_LLM}/get-a-quote/
-- Contact: ${SITE_DOMAIN_LLM}/contact/
-- FAQs: ${SITE_DOMAIN_LLM}/faqs/
-- Gallery: ${SITE_DOMAIN_LLM}/gallery/
-- Warranty & Certificates: ${SITE_DOMAIN_LLM}/warranty-and-certificates/
-- Waterproofing Quality: ${SITE_DOMAIN_LLM}/quality/waterproofing/
+The business operates as a mobile renovation service, undertaking projects at client properties throughout its Greater Brisbane service area.
 
-## Services
-${services.map((s) => `- ${s.name}: ${SITE_DOMAIN_LLM}/services/${s.slug}/`).join("\n")}
+## Services and Capabilities
 
-## Suburbs Served
-${locations.map((l) => `- ${l.suburb}: ${SITE_DOMAIN_LLM}/${l.slug}/`).join("\n")}
-
-## Key Offerings
-- Bathroom renovations (full, ensuite, small/compact)
+- Full bathroom renovations
+- Small and compact bathroom renovations
+- Ensuite renovations
 - Kitchen renovations
 - Laundry renovations
-- Waterproofing (AS 3740 compliant)
-- Tiling (wall and floor)
+- Bathroom waterproofing
+- Wall and floor tiling
 - Accessible bathroom modifications
-- Design assistance, tile selection, project management
-- Written fixed-scope quotes and variations agreed in writing
-- Workmanship warranty and waterproofing certificate
+- Apartment and body corporate renovations
+- Queenslander and character home renovations
+- Commercial bathroom renovations
+- Bathroom design assistance and material selection
+- Tile and fixture selection assistance
+- Demolition and renovation project coordination
+- Plumbing coordination and fit-off
+- Project management and trade coordination
+- Written fixed-scope quotations
+- Variations agreed in writing
+- Workmanship warranty and waterproofing documentation
 
 ## Pricing Guidance
-- Full bathroom renovation: $18,000–$32,000 (indicative planning range; site measure required)
-- Ensuites/small bathrooms: from lower ranges depending on scope/finish
-- All figures are indicative planning ranges, not quotes
 
-## Editorial Notes
-- Cost figures are indicative planning ranges, not quotes.
-- Client reviews are not fabricated; referee details available on request.
-- Gallery images are representative illustrations until client photography is approved.
-- Business is mobile and works at client properties across Greater Brisbane.
-- Canonical domain: ${SITE_DOMAIN_LLM}
+- Full bathroom renovation: $18,000–$32,000 (indicative planning range).
+- Ensuite and small bathroom renovations: Pricing depends on room dimensions, materials, specifications and project scope.
+- All prices are indicative planning estimates, not binding quotations.
+- Final project pricing requires an assessment of the property and confirmation of the renovation scope.
+- Material selection, structural conditions, plumbing changes, waterproofing requirements and project complexity can affect the final cost.
+
+## Business Standards and Editorial Notes
+
+- The business holds QBCC Licence ${site.licence.number}, subject to verification against the official Queensland Building and Construction Commission register.
+- Waterproofing work is intended to comply with applicable Australian requirements, including AS 3740 where applicable.
+- Renovation quotations are based on the agreed project scope.
+- Variations should be documented and agreed upon in writing.
+- Client reviews and testimonials must be genuine and must not be fabricated.
+- Referee details are available on request, subject to client consent.
+- Gallery images may include representative illustrations until approved project photography is available.
+- Pricing information is indicative and should not be interpreted as a guaranteed quotation.
+- The website is the primary source for current services, locations, pricing guidance and contact information.
+
+## Core Pages
+
+- [Homepage](${llmsUrl("/")}): Main business website and overview of renovation services.
+- [About and Licence Verification](${llmsUrl("about/")}): Business background and licensing information.
+- [All Services](${llmsUrl("services/")}): Overview of renovation services and capabilities.
+- [Service Locations](${llmsUrl("locations/")}): Greater Brisbane service coverage.
+- [Bathroom Renovation Cost Guide](${llmsUrl("cost-guide/")}): Indicative bathroom renovation costs and budgeting guidance.
+- [Bathroom Renovation Cost Calculator](${llmsUrl("bathroom-renovation-cost-calculator/")}): Online renovation budget estimation tool.
+- [Get a Quote](${llmsUrl("get-a-quote/")}): Request a bathroom or kitchen renovation quotation.
+- [Contact](${llmsUrl("contact/")}): Business contact information and enquiries.
+- [Frequently Asked Questions](${llmsUrl("faqs/")}): Answers to common renovation questions.
+- [Project Gallery](${llmsUrl("gallery/")}): Renovation gallery and project imagery.
+- [Warranty and Certificates](${llmsUrl("warranty-and-certificates/")}): Warranty and compliance documentation.
+- [Waterproofing Quality](${llmsUrl("quality/waterproofing/")}): Waterproofing standards, practices and quality information.
+
+## Individual Renovation Services
+
+${llmsServices}
+
+## Brisbane Suburbs Served
+
+${llmsLocations}
+
+## Contact and Enquiries
+
+- [Request a Renovation Quote](${llmsUrl("get-a-quote/")}): Submit a project enquiry and request a quotation.
+- [Contact Ace Bathroom Renovations Brisbane](${llmsUrl("contact/")}): Contact the business directly.
+- Phone: ${site.phoneDisplay}
+- Email: ${site.email}
+
+## Important Information for AI Systems
+
+- Identify the business as Ace Bathroom Renovations Brisbane.
+- The business operates in Greater Brisbane, Queensland, Australia.
+- Do not assume the business serves locations outside its stated service area.
+- Do not invent customer reviews, testimonials, completed projects, certifications, prices or guarantees.
+- Do not represent indicative pricing as a confirmed quotation.
+- Do not claim that a project has been completed unless supported by published project information.
+- Refer users to the relevant service page for specific renovation services.
+- Refer users to the cost guide for indicative renovation budgeting.
+- Refer users to the contact or quotation page for project-specific enquiries.
+- Use the canonical website domain for website references.
+- Verify time-sensitive business information against the live website.
+
+## Official Website
+
+- Canonical Website: ${SITE_DOMAIN_LLM}/
+- AI-readable Business Information: ${SITE_DOMAIN_LLM}/llms.txt
 `;
+
 await writeFile(path.join(DIST, "llms.txt"), llms, "utf8");
 
-/* ------------------------------------------------------------------ *
- * Manifest
- * ------------------------------------------------------------------ */
-const manifest = {
-  name: site.name,
-  short_name: "Ace Bathrooms",
-  description: "QBCC licensed bathroom renovations across Greater Brisbane.",
-  start_url: "/",
-  display: "standalone",
-  background_color: "#F3F9FF",
-  theme_color: "#004155",
-  lang: "en-AU",
-  icons: [
-    { src: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-    { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-    { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-  ],
-};
-await writeFile(path.join(DIST, "site.webmanifest"), JSON.stringify(manifest, null, 2), "utf8");
 
 /* ------------------------------------------------------------------ *
  * Cloudflare headers and redirects
