@@ -1,0 +1,13 @@
+{
+  "id": "/",
+  "name": "Ace Bathroom Renovations Brisbane",
+  "short_name": "Ace Bathrooms",
+  "description": "Professional bathroom and kitchen renovation services in Greater Brisbane, Queensland.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f2937",
+  "orientation": "portrait",
+  "icons": []
+}
