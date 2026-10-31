@@ -297,7 +297,7 @@ await writeFile(path.join(DIST, "_headers"), headers, "utf8");
 
 const canonicalHost = "acebathroomrenovationsbrisbane.com";
 const redirects = `# Canonical host redirects
-/* https://${canonicalHost}/:splat 301!
+/* https://${canonicalHost}/:splat 301
 
 # Common misspellings / variants
 /services/full-bathroom-renovations/ /services/full-bathroom-renovation/ 301
