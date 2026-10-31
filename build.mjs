@@ -135,13 +135,16 @@ await cp(path.join(ROOT, "src/app.js"), path.join(DIST, "app.js"));
 const xml = (s = "") =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+const SITE_DOMAIN = (process.env.CUSTOM_DOMAIN || process.env.SITE_DOMAIN || "https://acebathroomrenovationsbrisbane.com").replace(/\/+$/, "");
+const DOMAIN_HOST = SITE_DOMAIN.replace(/^https?:\/\//, "");
+
 const indexable = pages.filter((p) => !p.noindex);
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${indexable
   .map((p) => {
     const priority = p.path === "/" ? "1.0" : p.path === "/services/" || p.path === "/locations/" ? "0.9" : p.path.startsWith("/services/") || p.path.startsWith("/blog/") ? "0.7" : "0.6";
-    return `  <url><loc>${xml(site.domain + p.path)}</loc><lastmod>${LAST_MOD}</lastmod><changefreq>${p.path.startsWith("/blog/") ? "monthly" : "monthly"}</changefreq><priority>${priority}</priority></url>`;
+    return `  <url><loc>${xml(SITE_DOMAIN + p.path)}</loc><lastmod>${LAST_MOD}</lastmod><changefreq>monthly</changefreq><priority>${priority}</priority></url>`;
   })
   .join("\n")}
 </urlset>
@@ -166,8 +169,8 @@ Allow: /
 User-agent: PerplexityBot
 Allow: /
 
-Sitemap: ${site.domain}/sitemap.xml
-Host: ${site.domain.replace("https://", "")}
+Sitemap: ${SITE_DOMAIN}/sitemap.xml
+Host: ${DOMAIN_HOST}
 `;
 await writeFile(path.join(DIST, "robots.txt"), robots, "utf8");
 
