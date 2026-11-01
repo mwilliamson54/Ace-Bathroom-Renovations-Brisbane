@@ -42,7 +42,7 @@ export const site = {
   licence: {
     number: "17347609",
     label: "QBCC Licence 17347609",
-    verifyUrl: "https://www.qbcc.qld.gov.au/online-services/licence-search",
+    verifyUrl: "https://my.qbcc.qld.gov.au/myQBCC/s/qbcc-licensee-register",
     categories: [
       "Builder Restricted to Kitchen, Bathroom and Laundry",
       "Certificate III in Wall and Floor Tiling (CPC31320)",
