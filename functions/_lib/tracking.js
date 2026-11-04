@@ -84,7 +84,7 @@ function safeTouch(value) {
   };
 }
 
-export function parseTrackingContext(value) {
+export function parseTrackingContext(value, request) {
   if (typeof value === "string") {
     try { value = JSON.parse(value); } catch (_) { value = {}; }
   }
@@ -96,6 +96,7 @@ export function parseTrackingContext(value) {
     page_path: cleanText(c.page_path, 500),
     page_title: cleanText(c.page_title, 300),
     referrer: safeReferrer(c.referrer),
+    country_code: cleanText(request && request.cf && request.cf.country, 2).toUpperCase(),
     first_touch: safeTouch(c.first_touch),
     last_touch: safeTouch(c.last_touch),
     device: safeDevice(c.device)
@@ -152,7 +153,8 @@ export async function upsertIdentity(env, context) {
       last_seen_at: now,
       first_touch: context.first_touch,
       last_touch: context.last_touch,
-      latest_device: context.device
+      latest_device: context.device,
+      latest_country_code: context.country_code || null
     },
     prefer: "resolution=merge-duplicates,return=minimal"
   });
@@ -163,6 +165,7 @@ export async function upsertIdentity(env, context) {
       last_seen_at: now,
       landing_page: context.page_path,
       referrer: context.referrer,
+      country_code: context.country_code || null,
       attribution: context.last_touch,
       device: context.device
     },
@@ -170,8 +173,8 @@ export async function upsertIdentity(env, context) {
   });
 }
 
-export async function createLeadDraft(env, raw) {
-  const context = parseTrackingContext(raw);
+export async function createLeadDraft(env, raw, request) {
+  const context = parseTrackingContext(raw, request);
   const leadId = validUuid(raw.lead_id) ? raw.lead_id : null;
   if (!leadId) throw new Error("A valid lead id is required");
   await upsertIdentity(env, context);
@@ -199,7 +202,7 @@ export async function createLeadDraft(env, raw) {
 const EVENT_DATA_FIELDS = new Set([
   "form_type","form_status","button_type","button_location","button_text","link_text",
   "phone_number","scroll_percentage","question","filter_name","calculator_project",
-  "lead_status","source","page_section","service_name"
+  "lead_status","source","page_section","page_type","service_name"
 ]);
 
 function safeEventData(value) {
@@ -215,8 +218,8 @@ function safeEventData(value) {
   return out;
 }
 
-export async function recordVisitorEvent(env, raw) {
-  const context = parseTrackingContext(raw);
+export async function recordVisitorEvent(env, raw, request) {
+  const context = parseTrackingContext(raw, request);
   const eventName = cleanText(raw.event_name, 80);
   if (!ALLOWED_EVENTS.has(eventName)) throw new Error("Unsupported event name");
   await upsertIdentity(env, context);
@@ -248,8 +251,8 @@ export async function recordVisitorEvent(env, raw) {
   return { recorded: true, event_name: eventName };
 }
 
-export async function saveSubmittedLead(env, raw) {
-  const context = parseTrackingContext(raw.tracking_context);
+export async function saveSubmittedLead(env, raw, request) {
+  const context = parseTrackingContext(raw.tracking_context, request);
   const suppliedLeadId = validUuid(raw.lead_id) ? raw.lead_id : null;
   // Without a visitor identity, never attach to an existing draft id.
   const leadId = context.visitor_id && suppliedLeadId ? suppliedLeadId : crypto.randomUUID();
