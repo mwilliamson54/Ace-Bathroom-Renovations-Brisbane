@@ -391,11 +391,12 @@
       }, extra || {});
     }
     function ga(name, params) {
-      if (typeof window.gtag === "function") window.gtag("event", name, params || {});
+      // gtag config already sends the standard page_view automatically.
+      if (name !== "page_view" && typeof window.gtag === "function") window.gtag("event", name, params || {});
     }
     function startLead(source, formType) {
       var id = uuid();
-      try { sessionStorage.setItem("ace_pending_lead_id", id); } catch (_) {}
+      try { sessionStorage.setItem("ace_pending_lead_id", id); sessionStorage.setItem("ace_pending_lead_created_at", String(Date.now())); } catch (_) {}
       var data = payload({ lead_id:id, source:source || "website", form_type:formType || "quote" });
       fetch("/api/lead-start", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data), keepalive:true }).catch(function(){});
       return id;
@@ -436,7 +437,11 @@
     var status = form.querySelector(".form-status") || $("#quote-status");
     var submit = form.querySelector('button[type="submit"]');
     var leadId = "";
-    try { leadId = sessionStorage.getItem("ace_pending_lead_id") || ""; } catch (_) {}
+    try {
+      var pendingAt = Number(sessionStorage.getItem("ace_pending_lead_created_at") || 0);
+      if (pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) leadId = sessionStorage.getItem("ace_pending_lead_id") || "";
+      else { sessionStorage.removeItem("ace_pending_lead_id"); sessionStorage.removeItem("ace_pending_lead_created_at"); }
+    } catch (_) {}
     var leadPromise = null;
     var started = false;
     function show(kind, html) {
@@ -479,7 +484,7 @@
         if(result.ok && result.body.ok){
           ATTRIBUTION.event("generate_lead",{form_type:form.id,lead_status:"submitted"});
           form.reset(); leadId=""; leadPromise=null; started=false;
-          try { sessionStorage.removeItem("ace_pending_lead_id"); } catch (_) {}
+          try { sessionStorage.removeItem("ace_pending_lead_id"); sessionStorage.removeItem("ace_pending_lead_created_at"); } catch (_) {}
           show("success",result.body.message || "Thanks — your enquiry has been received. We will be in touch shortly.");
         } else {
           ATTRIBUTION.event("form_error",{form_type:form.id});
