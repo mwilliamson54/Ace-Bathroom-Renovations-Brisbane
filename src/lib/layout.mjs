@@ -389,7 +389,7 @@ export function renderPage({
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-4LT7P577ZF');
+  gtag('config', 'G-4LT7P577ZF', { send_page_view: false });
 </script>
 <style>${assets.css}</style>
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c")}</script>
