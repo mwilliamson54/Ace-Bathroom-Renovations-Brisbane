@@ -311,94 +311,174 @@
     }
   } catch (e) {}
 
+  /* ---------------- Visitor attribution and analytics ---------------- */
+  var ATTRIBUTION = (function () {
+    var STORAGE_KEY = "ace_attribution_v1";
+    var SESSION_KEY = "ace_session_v1";
+    function uuid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === "x" ? r : (r & 3 | 8)).toString(16);
+      });
+    }
+    function read(key) {
+      try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; }
+    }
+    var stored = read(STORAGE_KEY) || {};
+    if (!stored.visitor_id) stored.visitor_id = uuid();
+    if (!stored.created_at) stored.created_at = new Date().toISOString();
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (_) {}
+    var session = read(SESSION_KEY) || {};
+    if (!session.session_id || !session.started_at || Date.now() - Date.parse(session.started_at) > 30 * 60 * 1000) {
+      session = { session_id: uuid(), started_at: new Date().toISOString() };
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
+    }
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
+    var params = new URLSearchParams(location.search);
+    var referrer = document.referrer || "";
+    var clickIds = {};
+    ["gclid","gbraid","wbraid","msclkid","fbclid"].forEach(function (key) {
+      var value = params.get(key);
+      if (value) clickIds[key] = value.slice(0, 250);
+    });
+    var first = stored.first_touch || {
+      landing_page: location.pathname,
+      referrer: referrer.slice(0, 1000),
+      referrer_domain: (function(){ try{return referrer ? new URL(referrer).hostname : "";}catch(_){return "";} })(),
+      utm_source: (params.get("utm_source") || "").slice(0, 200),
+      utm_medium: (params.get("utm_medium") || "").slice(0, 200),
+      utm_campaign: (params.get("utm_campaign") || "").slice(0, 200),
+      utm_term: (params.get("utm_term") || "").slice(0, 200),
+      utm_content: (params.get("utm_content") || "").slice(0, 200),
+      click_ids: clickIds
+    };
+    stored.first_touch = first;
+    stored.last_touch = {
+      landing_page: location.pathname,
+      referrer: referrer.slice(0, 1000),
+      utm_source: (params.get("utm_source") || "").slice(0, 200),
+      utm_medium: (params.get("utm_medium") || "").slice(0, 200),
+      utm_campaign: (params.get("utm_campaign") || "").slice(0, 200),
+      utm_term: (params.get("utm_term") || "").slice(0, 200),
+      utm_content: (params.get("utm_content") || "").slice(0, 200),
+      click_ids: clickIds
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (_) {}
+    function device() {
+      var ua = navigator.userAgent || "";
+      var mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+      var tablet = /iPad|Tablet/i.test(ua);
+      var browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Other";
+      var os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "Other";
+      return { device_type: tablet ? "tablet" : mobile ? "mobile" : "desktop", browser_name: browser, operating_system: os, screen_width: screen.width || 0, screen_height: screen.height || 0, language: (navigator.language || "").slice(0,35), timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone || "").slice(0,80) };
+    }
+    function payload(extra) {
+      return Object.assign({
+        visitor_id: stored.visitor_id,
+        session_id: session.session_id,
+        page_url: location.href.slice(0, 2000),
+        page_path: location.pathname.slice(0, 500),
+        page_title: document.title.slice(0, 300),
+        referrer: referrer.slice(0, 1000),
+        first_touch: first,
+        last_touch: stored.last_touch,
+        device: device()
+      }, extra || {});
+    }
+    function ga(name, params) {
+      if (typeof window.gtag === "function") window.gtag("event", name, params || {});
+    }
+    function event(name, extra) {
+      var data = payload({ event_name: name, event_data: extra || {} });
+      fetch("/api/track", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data), keepalive:true }).catch(function(){});
+      ga(name, Object.assign({ page_location: location.href, page_title: document.title }, extra || {}));
+    }
+    return { payload:payload, event:event, ga:ga, visitorId:stored.visitor_id, sessionId:session.session_id };
+  })();
+
+  /* ---------------- Page and interaction events ---------------- */
+  ATTRIBUTION.event("page_view");
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest ? e.target.closest("a") : null;
+    if (!link) return;
+    var href = link.getAttribute("href") || "";
+    if (/^tel:/i.test(href)) {
+      ATTRIBUTION.event("call_click", { button_location: link.closest("header") ? "header" : link.closest("footer") ? "footer" : "content", link_text: (link.textContent || "").trim().slice(0,100) });
+    } else if (/get-a-quote|#quote-form/i.test(href)) {
+      ATTRIBUTION.event("quote_click", { button_location: link.closest("header") ? "header" : link.closest(".hero") ? "hero" : link.closest(".cta-band") ? "cta_band" : "content", link_text: (link.textContent || "").trim().slice(0,100) });
+    }
+  }, true);
+  var scrollMilestones = {};
+  window.addEventListener("scroll", function () {
+    var doc = document.documentElement;
+    var max = Math.max(1, doc.scrollHeight - window.innerHeight);
+    var pct = Math.min(100, Math.round((window.scrollY / max) * 100));
+    [25,50,75,90].forEach(function(n){
+      if (pct >= n && !scrollMilestones[n]) { scrollMilestones[n]=true; ATTRIBUTION.event("scroll_depth",{scroll_percentage:n}); }
+    });
+  }, {passive:true});
+
   /* ---------------- Quote / contact forms ---------------- */
   $$('form[action="/api/quote"]').forEach(function (form) {
-    var status = $("#quote-status");
+    var status = form.querySelector(".form-status") || $("#quote-status");
     var submit = form.querySelector('button[type="submit"]');
-
+    var leadId = "";
+    var leadPromise = null;
+    var started = false;
     function show(kind, html) {
       if (!status) return;
-
       status.className = "form-status is-visible form-status--" + kind;
       status.innerHTML = html;
     }
-
+    function createLead() {
+      if (leadPromise) return leadPromise;
+      ATTRIBUTION.event("quote_click", { form_type: form.id === "contact-form" ? "contact" : "quote", button_location: "form" });
+      leadPromise = fetch("/api/lead-start", {
+        method:"POST", headers:{"content-type":"application/json"},
+        body:JSON.stringify(ATTRIBUTION.payload({form_type:form.id === "contact-form" ? "contact" : "quote", source:(form.querySelector('[name="source"]')||{}).value || "website"}))
+      }).then(function(r){return r.json().then(function(b){return {ok:r.ok,body:b};});})
+        .then(function(r){ if(r.ok && r.body && r.body.ok) { leadId=r.body.lead_id; var hidden=form.querySelector('[name="lead_id"]'); if(!hidden){hidden=document.createElement("input");hidden.type="hidden";hidden.name="lead_id";form.appendChild(hidden);} hidden.value=leadId; } return leadId; })
+        .catch(function(){ return ""; });
+      return leadPromise;
+    }
+    form.addEventListener("focusin", function(){ if(!started){started=true;ATTRIBUTION.event("form_start",{form_type:form.id});createLead();} });
+    var quoteTarget = form.id === "quote-form" ? $("#quote-form") : form;
+    if (form.id === "quote-form" && quoteTarget) {
+      var observer = new IntersectionObserver(function(entries){ entries.forEach(function(entry){ if(entry.isIntersecting && !started){started=true;ATTRIBUTION.event("quote_form_view");} }); }, {threshold:0.25});
+      observer.observe(quoteTarget);
+    }
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
-
+      if (!form.checkValidity()) { form.reportValidity(); return; }
       var consent = form.querySelector('input[name="consent"]');
-
-      if (consent && !consent.checked) {
-        show("error", "Please confirm you agree to be contacted about this enquiry.");
-        consent.focus();
-        return;
-      }
-
-      if (submit) {
-        submit.disabled = true;
-        submit.dataset.label = submit.textContent;
-        submit.textContent = "Sending…";
-      }
-
-      show("info", "Sending your enquiry…");
-
+      if (consent && !consent.checked) { show("error","Please confirm you agree to be contacted about this enquiry."); consent.focus(); return; }
+      if (submit) { submit.disabled=true; submit.dataset.label=submit.textContent; submit.textContent="Sending…"; }
+      show("info","Sending your enquiry…");
       var data = new FormData(form);
-
-      fetch(form.getAttribute("action"), {
-        method: "POST",
-        body: data,
-        headers: {
-          "Accept": "application/json"
+      createLead().then(function(){
+        if (leadId) data.set("lead_id",leadId);
+        var context = ATTRIBUTION.payload();
+        data.set("tracking_context", JSON.stringify(context));
+        return fetch(form.getAttribute("action"),{method:"POST",body:data,headers:{"Accept":"application/json"}});
+      }).then(function(res){return res.json().catch(function(){return {};}).then(function(body){return {ok:res.ok,body:body};});})
+      .then(function(result){
+        if(result.ok && result.body.ok){
+          ATTRIBUTION.event("generate_lead",{form_type:form.id,lead_status:"submitted"});
+          form.reset(); leadId=""; leadPromise=null; started=false;
+          show("success",result.body.message || "Thanks — your enquiry has been received. We will be in touch shortly.");
+        } else {
+          ATTRIBUTION.event("form_error",{form_type:form.id});
+          show("error",result.body && result.body.message ? result.body.message : "We could not send the form. Please call (07) 8590 6941 or email AceBathroomRenovationsBrisbane@gmail.com.");
         }
-      })
-        .then(function (res) {
-          return res.json().catch(function () {
-            return {};
-          }).then(function (body) {
-            return {
-              ok: res.ok,
-              body: body
-            };
-          });
-        })
-        .then(function (result) {
-          if (result.ok && result.body.ok) {
-            form.reset();
-
-            show(
-              "success",
-              result.body.message ||
-              "Thanks — your enquiry has been received. We will be in touch shortly."
-            );
-          } else {
-            show(
-              "error",
-              (result.body && result.body.message) ?
-                result.body.message :
-                "We could not send the form. Please call (07) 8590 6941 or email AceBathroomRenovationsBrisbane@gmail.com."
-            );
-          }
-        })
-        .catch(function () {
-          show(
-            "error",
-            'The form could not be sent from this device. Please call ' +
-            '<a href="tel:+61785906941">(07) 8590 6941</a> or email ' +
-            '<a href="mailto:AceBathroomRenovationsBrisbane@gmail.com">AceBathroomRenovationsBrisbane@gmail.com</a>.'
-          );
-        })
-        .finally(function () {
-          if (submit) {
-            submit.disabled = false;
-            submit.textContent = submit.dataset.label || "Send enquiry";
-          }
-        });
+      }).catch(function(){
+        show("error",'The form could not be sent from this device. Please call <a href="tel:+61785906941">(07) 8590 6941</a> or email <a href="mailto:AceBathroomRenovationsBrisbane@gmail.com">AceBathroomRenovationsBrisbane@gmail.com</a>.');
+      }).finally(function(){ if(submit){submit.disabled=false;submit.textContent=submit.dataset.label || "Send enquiry";} });
     });
+    window.addEventListener("beforeunload",function(){ if(started && !leadId) ATTRIBUTION.event("form_abandon",{form_type:form.id}); });
   });
+
+  /* ---------------- FAQ interactions ---------------- */
+  $$("details.faq-item").forEach(function(item){ item.addEventListener("toggle",function(){if(item.open)ATTRIBUTION.event("faq_open",{question:(item.querySelector("summary")||{}).textContent||""});}); });
 
 })();
