@@ -251,7 +251,8 @@ export async function recordVisitorEvent(env, raw) {
 export async function saveSubmittedLead(env, raw) {
   const context = parseTrackingContext(raw.tracking_context);
   const suppliedLeadId = validUuid(raw.lead_id) ? raw.lead_id : null;
-  const leadId = suppliedLeadId || crypto.randomUUID();
+  // Without a visitor identity, never attach to an existing draft id.
+  const leadId = context.visitor_id && suppliedLeadId ? suppliedLeadId : crypto.randomUUID();
   await upsertIdentity(env, context);
 
   const base = {
