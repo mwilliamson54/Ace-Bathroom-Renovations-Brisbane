@@ -12,7 +12,7 @@ const privacyBody = `
     <p class="eyebrow">Legal</p>
     <h1>Privacy Policy</h1>
     <p class="lead">How Ace Bathroom Renovations Brisbane collects, uses, stores and protects personal information.</p>
-    <p class="page-hero__meta">Last updated: 26 October 2026</p>
+    <p class="page-hero__meta">Last updated: 4 November 2026</p>
   </div>
 </section>
 
@@ -80,6 +80,11 @@ const privacyBody = `
 
     <h2>Cookies and analytics</h2>
     <p>This website may use essential cookies and, where enabled, privacy-respecting analytics to understand which pages are useful. We do not use the website to build advertising profiles of individual visitors. You can block or delete cookies in your browser settings. Blocking essential cookies may affect some site features.</p>
+
+    <p>We use Google Analytics 4 to understand overall website traffic and engagement. It may receive page views, device and browser categories, approximate technical information, referral information and campaign parameters. We do not send names, phone numbers, email addresses or enquiry message contents to Google Analytics.</p>
+    <p>For enquiry attribution, this website may also create a first-party visitor identifier and a session identifier in your browser. These help us connect a visit, a Get a Quote button click, a quote-form submission and a phone-link click. We record page paths, referring pages, campaign tags, basic device/browser details and selected website interactions. When you click a Get a Quote link, a draft enquiry record is created; if you submit the form, that same record is updated with the details you provided. A click on a phone link records that the link was clicked; it does not prove that a telephone call connected or was answered.</p>
+    <p>Website event and enquiry records are processed by Cloudflare Pages and our Supabase database provider. Quote submissions may also be delivered through the email or webhook services described above. These providers may process data outside Australia, depending on their infrastructure and configuration. We restrict access to the database and do not expose its administrative key in website code.</p>
+    <p>You can limit or remove browser storage and cookies through your browser settings. Doing so may prevent us from connecting website activity to a later quote enquiry, but the quote form can still be submitted. We use this information to understand service interest, measure enquiry performance, investigate delivery problems and improve the website; we do not sell visitor or enquiry data.</p>
 
     <h2>Your choices and rights</h2>
     <p>You may ask us to:</p>
