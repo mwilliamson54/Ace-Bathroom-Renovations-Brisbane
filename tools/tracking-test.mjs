@@ -99,6 +99,9 @@ try {
   assert.equal(startLeadInsert.body.country_code, "AU");
   assert.equal(startLeadInsert.headers.apikey, env.SUPABASE_SECRET_KEY);
   assert.ok(!("authorization" in startLeadInsert.headers), "opaque sb_secret key must not be used as a Bearer JWT");
+  assert.ok(calls.filter((call) => call.url.includes("supabase.co")).every((call) =>
+    !call.url.includes("/rest/v1/rest/v1/")
+  ), "a pasted /rest/v1/ suffix must not be duplicated in REST requests");
 
   const eventRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
     method: "POST",
