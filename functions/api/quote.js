@@ -298,7 +298,7 @@ async function handlePost(context) {
       timeline: data.timeline,
       message: data.message,
       consent: data.consent,
-    });
+    }, request);
   } catch (error) {
     console.error("Supabase lead save failed:", error && error.message);
   }
