@@ -303,7 +303,7 @@ async function handlePost(context) {
     console.error("Supabase lead save failed:", error && error.message);
   }
 
-  const configured = Boolean(env.RESEND_API_KEY && env.QUOTE_TO_EMAIL && env.QUOTE_FROM_EMAIL) || Boolean(env.QUOTE_WEBHOOK_URL);
+  const configured = Boolean(env.QUOTE_WEBHOOK_URL);
   if (!configured) {
     return finish(
       json(
@@ -318,11 +318,9 @@ async function handlePost(context) {
     );
   }
 
-  // In production, route emails through the configured Google Apps Script relay.
-  // Resend is used only when no webhook relay has been configured, avoiding duplicates.
-  const results = env.QUOTE_WEBHOOK_URL
-    ? await Promise.allSettled([sendWebhook(env, data)])
-    : await Promise.allSettled([sendWithResend(env, data)]);
+  // Google Apps Script is the required production delivery route.
+  // Do not silently fall back to another provider if the relay is missing or down.
+  const results = await Promise.allSettled([sendWebhook(env, data)]);
   const delivered = results.some((r) => r.status === "fulfilled" && r.value && r.value.sent);
 
   if (!delivered) {
