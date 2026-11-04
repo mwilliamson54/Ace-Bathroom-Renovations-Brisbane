@@ -342,7 +342,7 @@
       var value = params.get(key);
       if (value) clickIds[key] = value.slice(0, 250);
     });
-    var first = stored.first_touch || {
+    var currentTouch = {
       landing_page: location.pathname,
       referrer: referrer.slice(0, 1000),
       referrer_domain: (function(){ try{return referrer ? new URL(referrer).hostname : "";}catch(_){return "";} })(),
@@ -353,17 +353,13 @@
       utm_content: (params.get("utm_content") || "").slice(0, 200),
       click_ids: clickIds
     };
+    var first = stored.first_touch || currentTouch;
     stored.first_touch = first;
-    stored.last_touch = {
-      landing_page: location.pathname,
-      referrer: referrer.slice(0, 1000),
-      utm_source: (params.get("utm_source") || "").slice(0, 200),
-      utm_medium: (params.get("utm_medium") || "").slice(0, 200),
-      utm_campaign: (params.get("utm_campaign") || "").slice(0, 200),
-      utm_term: (params.get("utm_term") || "").slice(0, 200),
-      utm_content: (params.get("utm_content") || "").slice(0, 200),
-      click_ids: clickIds
-    };
+    var currentReferrerIsExternal = false;
+    try { currentReferrerIsExternal = Boolean(referrer && new URL(referrer).hostname !== location.hostname); } catch (_) {}
+    var hasNewCampaign = Boolean(currentTouch.utm_source || currentTouch.utm_medium || currentTouch.utm_campaign ||
+      currentTouch.utm_term || currentTouch.utm_content || Object.keys(clickIds).length);
+    if (hasNewCampaign || currentReferrerIsExternal || !stored.last_touch) stored.last_touch = currentTouch;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (_) {}
     function device() {
       var ua = navigator.userAgent || "";
@@ -417,7 +413,14 @@
   })();
 
   /* ---------------- Page and interaction events ---------------- */
-  ATTRIBUTION.event("page_view");
+  var pathForType = location.pathname;
+  var pageType = /^\/services\//.test(pathForType) ? "service" :
+    /^\/bathroom-renovations-/.test(pathForType) ? "location" :
+    /cost-guide|cost-calculator/.test(pathForType) ? "pricing" :
+    pathForType === "/get-a-quote/" ? "quote" : "content";
+  ATTRIBUTION.event("page_view", { page_type:pageType });
+  if (pageType === "service") ATTRIBUTION.event("service_view", { page_type:pageType });
+  if (pageType === "pricing") ATTRIBUTION.event("pricing_view", { page_type:pageType });
   document.addEventListener("click", function (e) {
     var link = e.target.closest ? e.target.closest("a") : null;
     if (!link) return;
@@ -467,6 +470,10 @@
         .catch(function(){ return ""; });
       return leadPromise;
     }
+    form.addEventListener("click", function(e){
+      var submitButton = e.target.closest ? e.target.closest('button[type="submit"]') : null;
+      if (submitButton) ATTRIBUTION.event("quote_click",{form_type:form.id === "contact-form" ? "contact" : "quote",button_location:"form_submit"});
+    });
     form.addEventListener("focusin", function(){ if(!started){started=true;ATTRIBUTION.event("form_start",{form_type:form.id});createLead();} });
     var quoteTarget = form.id === "quote-form" ? $("#quote-form") : form;
     if (form.id === "quote-form" && quoteTarget) {
@@ -502,6 +509,20 @@
       }).finally(function(){ if(submit){submit.disabled=false;submit.textContent=submit.dataset.label || "Send enquiry";} });
     });
     window.addEventListener("beforeunload",function(){ if(started && !leadId) ATTRIBUTION.event("form_abandon",{form_type:form.id}); });
+  });
+
+  /* ---------------- Calculator and gallery interactions ---------------- */
+  var calculator = $("#cost-calculator");
+  if (calculator) calculator.addEventListener("change", function(){
+    ATTRIBUTION.event("calculator_interaction", {
+      calculator_project: (calculator.querySelector('[name="project"]') || {}).value || "",
+      page_section: "cost_calculator"
+    });
+  });
+  $(".filter-btn[data-filter]").forEach(function(button){
+    button.addEventListener("click", function(){
+      ATTRIBUTION.event("gallery_filter", { filter_name:button.getAttribute("data-filter") || "" });
+    });
   });
 
   /* ---------------- FAQ interactions ---------------- */
