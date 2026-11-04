@@ -115,6 +115,13 @@ function enquiryHtml(data) {
 
 async function sendWebhook(env, data) {
   if (!env.QUOTE_WEBHOOK_URL) return { skipped: true };
+  // Only pass the enquiry fields needed by the relay. Visitor IDs, session IDs
+  // and campaign attribution remain in Supabase and are not sent to Apps Script.
+  const {
+    leadId: _leadId,
+    trackingContext: _trackingContext,
+    ...enquiry
+  } = data;
   const res = await fetch(env.QUOTE_WEBHOOK_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -122,7 +129,7 @@ async function sendWebhook(env, data) {
       type: "quote_enquiry",
       site: "acebathroomrenovationsbrisbane.com",
       receivedAt: new Date().toISOString(),
-      ...data,
+      ...enquiry,
       honeypot: undefined,
     }),
   });
