@@ -1,0 +1,30 @@
+name: Tracking feature validation
+
+on:
+  push:
+    branches: [feat/visitor-lead-attribution]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build site
+        run: npm run build
+      - name: Run site quality gate
+        run: npm run check
+      - name: Exercise quote endpoint
+        run: npm run test:api
