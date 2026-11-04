@@ -10,7 +10,8 @@ create table if not exists public.ace_visitors (
   last_seen_at timestamptz not null default now(),
   first_touch jsonb not null default '{}'::jsonb,
   last_touch jsonb not null default '{}'::jsonb,
-  latest_device jsonb not null default '{}'::jsonb
+  latest_device jsonb not null default '{}'::jsonb,
+  latest_country_code text
 );
 
 create table if not exists public.ace_sessions (
@@ -20,6 +21,7 @@ create table if not exists public.ace_sessions (
   last_seen_at timestamptz not null default now(),
   landing_page text,
   referrer text,
+  country_code text,
   attribution jsonb not null default '{}'::jsonb,
   device jsonb not null default '{}'::jsonb
 );
