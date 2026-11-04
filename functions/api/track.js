@@ -11,7 +11,7 @@ export async function onRequest({ request, env }) {
   const context = parseTrackingContext(body);
   if (!context.visitor_id || !context.session_id) return json({ ok:false, message:"Invalid visitor context." }, 400);
   try {
-    const result = await recordVisitorEvent(env, body);
+    const result = await recordVisitorEvent(env, body, request);
     return json({ ok:true, ...result });
   } catch (error) {
     console.error("Visitor event write failed:", error && error.message);
