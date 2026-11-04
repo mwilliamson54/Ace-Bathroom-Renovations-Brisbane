@@ -111,15 +111,14 @@ function supabaseConfig(env) {
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== "https:") return null;
-    // Accept either the project root or the REST API URL pasted from the
-    // Supabase dashboard. The PostgREST path is appended exactly once below.
-    if (/\\/rest\\/v1\\/?$/i.test(parsed.pathname)) parsed.pathname = "";
-    if (parsed.pathname === "/") parsed.pathname = "";
-    if (parsed.pathname) return null;
+    // Accept the project root or a REST URL ending in /rest/v1/.
+    let pathname = parsed.pathname;
+    while (pathname.endsWith("/")) pathname = pathname.slice(0, -1);
+    if (pathname.endsWith("/rest/v1")) pathname = pathname.slice(0, -8);
+    if (pathname !== "") return null;
     return { url: parsed.origin, key, legacy: !secretKey };
   } catch (_) { return null; }
 }
-
 async function db(env, table, query, options = {}) {
   const config = supabaseConfig(env);
   if (!config) throw new Error("Supabase is not configured");
