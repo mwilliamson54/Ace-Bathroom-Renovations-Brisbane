@@ -269,6 +269,7 @@ export async function saveSubmittedLead(env, raw, request) {
     page_path: context.page_path,
     page_title: context.page_title,
     referrer: context.referrer,
+    country_code: context.country_code || null,
     first_touch: context.first_touch,
     last_touch: context.last_touch,
     device: context.device,
