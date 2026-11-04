@@ -103,16 +103,21 @@ export function parseTrackingContext(value) {
 }
 
 function supabaseConfig(env) {
-  const url = cleanText(env && env.SUPABASE_URL, 300).replace(/\/+$/, "");
+  const rawUrl = cleanText(env && env.SUPABASE_URL, 300);
   const secretKey = String((env && env.SUPABASE_SECRET_KEY) || "").trim();
   const legacyKey = String((env && env.SUPABASE_SERVICE_ROLE_KEY) || "").trim();
   const key = secretKey || legacyKey;
-  if (!url || !key) return null;
+  if (!rawUrl || !key) return null;
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(rawUrl);
     if (parsed.protocol !== "https:") return null;
+    // Accept either the project root or the REST API URL pasted from the
+    // Supabase dashboard. The PostgREST path is appended exactly once below.
+    if (/\\/rest\\/v1\\/?$/i.test(parsed.pathname)) parsed.pathname = "";
+    if (parsed.pathname === "/") parsed.pathname = "";
+    if (parsed.pathname) return null;
+    return { url: parsed.origin, key, legacy: !secretKey };
   } catch (_) { return null; }
-  return { url, key, legacy: !secretKey };
 }
 
 async function db(env, table, query, options = {}) {
