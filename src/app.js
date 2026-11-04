@@ -330,7 +330,7 @@
     if (!stored.created_at) stored.created_at = new Date().toISOString();
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (_) {}
     var session = read(SESSION_KEY) || {};
-    if (!session.session_id || !session.started_at || Date.now() - Date.parse(session.started_at) > 30 * 60 * 1000) {
+    if (!session.session_id || !session.started_at || Date.now() - Date.parse(session.last_seen_at || session.started_at) > 30 * 60 * 1000) {
       session = { session_id: uuid(), started_at: new Date().toISOString() };
       try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
     }
