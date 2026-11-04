@@ -104,13 +104,15 @@ export function parseTrackingContext(value) {
 
 function supabaseConfig(env) {
   const url = cleanText(env && env.SUPABASE_URL, 300).replace(/\/+$/, "");
-  const key = String((env && env.SUPABASE_SERVICE_ROLE_KEY) || "").trim();
+  const secretKey = String((env && env.SUPABASE_SECRET_KEY) || "").trim();
+  const legacyKey = String((env && env.SUPABASE_SERVICE_ROLE_KEY) || "").trim();
+  const key = secretKey || legacyKey;
   if (!url || !key) return null;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return null;
   } catch (_) { return null; }
-  return { url, key };
+  return { url, key, legacy: !secretKey };
 }
 
 async function db(env, table, query, options = {}) {
@@ -121,7 +123,7 @@ async function db(env, table, query, options = {}) {
     method: options.method || "POST",
     headers: {
       "apikey": config.key,
-      "authorization": "Bearer " + config.key,
+      ...(config.legacy ? { "authorization": "Bearer " + config.key } : {}),
       "content-type": "application/json",
       "prefer": options.prefer || "return=minimal"
     },
@@ -302,14 +304,16 @@ export async function saveSubmittedLead(env, raw) {
 }
 
 export async function updateLeadDelivery(env, leadId, visitorId, status, error, resendId) {
-  if (!validUuid(leadId) || !validUuid(visitorId)) return;
+  if (!validUuid(leadId)) return;
   const body = {
     delivery_status: status,
     status: status === "delivered" ? "submitted" : status === "not_configured" ? "delivery_failed" : "delivery_failed",
     delivery_error: cleanText(error, 500),
     resend_id: cleanText(resendId, 120)
   };
-  await db(env, "ace_quote_leads",
-    "id=eq." + encodeURIComponent(leadId) + "&visitor_id=eq." + encodeURIComponent(visitorId),
-    { method: "PATCH", body, prefer: "return=minimal" });
+  const filter = "id=eq." + encodeURIComponent(leadId) +
+    (validUuid(visitorId) ? "&visitor_id=eq." + encodeURIComponent(visitorId) : "");
+  await db(env, "ace_quote_leads", filter, {
+    method: "PATCH", body, prefer: "return=minimal"
+  });
 }
