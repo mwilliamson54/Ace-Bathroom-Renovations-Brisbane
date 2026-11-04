@@ -28,3 +28,5 @@ jobs:
         run: npm run check
       - name: Exercise quote endpoint
         run: npm run test:api
+      - name: Verify tracking and same-row lead update
+        run: npm run test:tracking
