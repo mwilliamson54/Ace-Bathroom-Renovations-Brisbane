@@ -1,3 +1,5 @@
+import { parseTrackingContext, saveSubmittedLead, updateLeadDelivery } from "../_lib/tracking.js";
+
 /**
  * Cloudflare Pages Function — POST /api/quote
  *
@@ -52,6 +54,9 @@ function fieldsFrom(form) {
     timeline: get("timeline", 80),
     message: get("message", 2000),
     source: get("source", 60),
+    formType: get("form_type", 40),
+    leadId: get("lead_id", 36),
+    trackingContext: String(form.get("tracking_context") || "").slice(0, 12000),
     consent: form.get("consent") === "yes" || form.get("consent") === "on",
     honeypot: get("ax_hp", 200) || get("company_website", 200),
   };
@@ -261,6 +266,31 @@ async function handlePost(context) {
     return finish(json({ ok: false, message: errors[0] }, 422), "invalid", { error: errors[0] });
   }
 
+  // Save the completed form against the click-created draft. Database failures
+  // are logged but never block the existing email/webhook delivery path.
+  let trackingLeadId = "";
+  const trackingContext = parseTrackingContext(data.trackingContext);
+  try {
+    trackingLeadId = await saveSubmittedLead(env, {
+      lead_id: data.leadId,
+      tracking_context: data.trackingContext,
+      source: data.source,
+      form_type: data.formType || (data.source === "contact-page" ? "contact" : "quote"),
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      suburb: data.suburb,
+      property: data.property,
+      project: data.project,
+      budget: data.budget,
+      timeline: data.timeline,
+      message: data.message,
+      consent: data.consent,
+    });
+  } catch (error) {
+    console.error("Supabase lead save failed:", error && error.message);
+  }
+
   const configured = Boolean(env.RESEND_API_KEY && env.QUOTE_TO_EMAIL && env.QUOTE_FROM_EMAIL) || Boolean(env.QUOTE_WEBHOOK_URL);
   if (!configured) {
     return finish(
@@ -274,6 +304,10 @@ async function handlePost(context) {
       ),
       "not_configured"
     );
+    if (trackingLeadId) {
+      try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "not_configured", "No delivery channel configured", ""); }
+      catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
+    }
   }
 
   const results = await Promise.allSettled([sendWithResend(env, data), sendWebhook(env, data)]);
@@ -297,6 +331,10 @@ async function handlePost(context) {
       "undelivered",
       { deliveryError: detail.join(" | ") }
     );
+    if (trackingLeadId) {
+      try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "failed", detail.join(" | "), ""); }
+      catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
+    }
   }
 
   console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
@@ -307,10 +345,15 @@ async function handlePost(context) {
     json({
       ok: true,
       message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
+      lead_id: trackingLeadId || null,
     }),
     "delivered",
     { resendId }
   );
+  if (trackingLeadId) {
+    try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "delivered", "", resendId); }
+    catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
+  }
 }
 
 async function handleGet() {
