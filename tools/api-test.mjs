@@ -12,12 +12,10 @@ const resendEnv = {RESEND_API_KEY:"x",QUOTE_TO_EMAIL:"a@b.com",QUOTE_FROM_EMAIL:
 const realFetch = globalThis.fetch;
 const mock = (handler) => { globalThis.fetch = handler; };
 
-// Resend succeeds.
-mock(async () => new Response(JSON.stringify({id:"x"}),{status:200,headers:{"content-type":"application/json"}}));
-show("resend ok", await run(base, resendEnv));
-show("honeypot genuine", await run({...base,ax_hp:"spam"}, resendEnv));
+// Resend-only configuration is not accepted: production requires Apps Script.
+show("Resend-only configuration", await run(base, resendEnv));
 
-// Relay only, no Resend: Apps Script accepts the enquiry.
+// Apps Script relay accepts the enquiry.
 mock(async (url) => {
   if (String(url).includes("script.google.com")) {
     return new Response(JSON.stringify({ok:true, id:"2026-10-27T00:00:00.000Z", sheet:"ok"}), {status:200,headers:{"content-type":"application/json"}});
@@ -39,11 +37,11 @@ show("webhook rejects token", await run(base, {QUOTE_WEBHOOK_URL:"https://script
 mock(async () => new Response("ok", {status:200}));
 show("webhook plain text ok", await run(base, {QUOTE_WEBHOOK_URL:"https://hooks.example.com/x"}));
 
-// Relay down, Resend down: undelivered, 502.
+// Apps Script relay down: undelivered, 502; no alternate provider is attempted.
 mock(async () => new Response("boom", {status:500}));
 show("both channels fail", await run(base, {...resendEnv, QUOTE_WEBHOOK_URL:"https://hooks.example.com/x"}));
 
-// Resend fails but relay works: delivered.
+// Apps Script relay works: delivered.
 mock(async (url) => {
   if (String(url).includes("resend.com")) return new Response("nope", {status:500});
   return new Response(JSON.stringify({ok:true}), {status:200,headers:{"content-type":"application/json"}});
