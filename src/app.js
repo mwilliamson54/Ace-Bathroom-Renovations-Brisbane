@@ -461,6 +461,13 @@
     }
     function createLead() {
       if (leadPromise) return leadPromise;
+      if (!leadId) {
+        try {
+          var pendingAt = Number(sessionStorage.getItem("ace_pending_lead_created_at") || 0);
+          var pendingId = sessionStorage.getItem("ace_pending_lead_id") || "";
+          if (pendingId && pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) leadId = pendingId;
+        } catch (_) {}
+      }
       if (!leadId) leadId = ATTRIBUTION.startLead((form.querySelector('[name="source"]')||{}).value || "website", form.id === "contact-form" ? "contact" : "quote");
       leadPromise = fetch("/api/lead-start", {
         method:"POST", headers:{"content-type":"application/json"},
