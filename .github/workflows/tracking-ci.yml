@@ -24,6 +24,8 @@ jobs:
         run: npm ci
       - name: Build site
         run: npm run build
+      - name: Check JavaScript syntax
+        run: node --check src/app.js && node --check functions/_lib/tracking.js && node --check functions/api/lead-start.js && node --check functions/api/track.js && node --check functions/api/quote.js
       - name: Run site quality gate
         run: npm run check
       - name: Exercise quote endpoint
