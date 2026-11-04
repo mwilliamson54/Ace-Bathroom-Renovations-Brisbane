@@ -158,6 +158,9 @@ try {
 
   const relayCalls = calls.filter((call) => call.url.includes("script.google.com"));
   assert.equal(relayCalls.length, 1, "Apps Script relay should be called once");
+  assert.ok(!("leadId" in relayCalls[0].body), "lead UUID remains in Supabase and is not sent to Apps Script");
+  assert.ok(!("trackingContext" in relayCalls[0].body), "visitor/session and campaign context remains in Supabase");
+  assert.ok(!("tracking_context" in relayCalls[0].body), "snake-case tracking context is not sent to Apps Script");
   assert.ok(!calls.some((call) => call.url.includes("resend.com")), "Resend should not run when Apps Script is configured");
 
   console.log("PASS  CTA click creates a Supabase draft");
