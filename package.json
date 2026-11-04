@@ -15,7 +15,8 @@
     "images:list": "node tools/import-images.mjs --list",
     "images:report": "node tools/image-report.mjs",
     "images:sheet": "node tools/contact-sheet.mjs --all",
-    "make:og": "node tools/make-og.mjs"
+    "make:og": "node tools/make-og.mjs",
+    "test:tracking": "node tools/tracking-test.mjs"
   },
   "engines": {
     "node": ">=20"
