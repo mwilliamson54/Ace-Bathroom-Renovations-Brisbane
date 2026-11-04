@@ -215,6 +215,8 @@ async function handlePost(context) {
   }
 
   const data = fieldsFrom(form);
+  const trackingContext = parseTrackingContext(data.trackingContext);
+  let trackingLeadId = "";
 
   // Diagnostic trail. Deliberately logs no names, phone numbers, emails or message
   // bodies: only field presence and the delivery outcome.
@@ -244,6 +246,18 @@ async function handlePost(context) {
       country: (request.cf && request.cf.country) || "",
       ...extra,
     });
+    if (trackingLeadId) {
+      const deliveryStatus = outcome === "delivered" ? "delivered" :
+        outcome === "not_configured" ? "not_configured" : "failed";
+      try {
+        await updateLeadDelivery(
+          env, trackingLeadId, trackingContext && trackingContext.visitor_id,
+          deliveryStatus, extra.deliveryError || "", extra.resendId || ""
+        );
+      } catch (error) {
+        console.error("Supabase delivery status update failed:", error && error.message);
+      }
+    }
     return response;
   };
 
@@ -268,8 +282,6 @@ async function handlePost(context) {
 
   // Save the completed form against the click-created draft. Database failures
   // are logged but never block the existing email/webhook delivery path.
-  let trackingLeadId = "";
-  const trackingContext = parseTrackingContext(data.trackingContext);
   try {
     trackingLeadId = await saveSubmittedLead(env, {
       lead_id: data.leadId,
@@ -304,13 +316,13 @@ async function handlePost(context) {
       ),
       "not_configured"
     );
-    if (trackingLeadId) {
-      try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "not_configured", "No delivery channel configured", ""); }
-      catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
-    }
   }
 
-  const results = await Promise.allSettled([sendWithResend(env, data), sendWebhook(env, data)]);
+  // In production, route emails through the configured Google Apps Script relay.
+  // Resend is used only when no webhook relay has been configured, avoiding duplicates.
+  const results = env.QUOTE_WEBHOOK_URL
+    ? await Promise.allSettled([sendWebhook(env, data)])
+    : await Promise.allSettled([sendWithResend(env, data)]);
   const delivered = results.some((r) => r.status === "fulfilled" && r.value && r.value.sent);
 
   if (!delivered) {
@@ -331,10 +343,6 @@ async function handlePost(context) {
       "undelivered",
       { deliveryError: detail.join(" | ") }
     );
-    if (trackingLeadId) {
-      try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "failed", detail.join(" | "), ""); }
-      catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
-    }
   }
 
   console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
@@ -350,10 +358,6 @@ async function handlePost(context) {
     "delivered",
     { resendId }
   );
-  if (trackingLeadId) {
-    try { await updateLeadDelivery(env, trackingLeadId, trackingContext.visitor_id, "delivered", "", resendId); }
-    catch (error) { console.error("Supabase delivery status update failed:", error && error.message); }
-  }
 }
 
 async function handleGet() {
