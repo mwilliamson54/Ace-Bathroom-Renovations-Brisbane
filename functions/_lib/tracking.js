@@ -297,13 +297,8 @@ export async function saveSubmittedLead(env, raw) {
     return fallbackId;
   }
 
-  // No first-party visitor context: retain the enquiry without linking identities.
-  const fallbackId = crypto.randomUUID();
-  await db(env, "ace_quote_leads", "", {
-    body: Object.assign({}, base, { id: fallbackId }),
-    prefer: "return=minimal"
-  });
-  return fallbackId;
+  // No first-party visitor context: keep the submission-only row created above.
+  return leadId;
 }
 
 export async function updateLeadDelivery(env, leadId, visitorId, status, error, resendId) {
