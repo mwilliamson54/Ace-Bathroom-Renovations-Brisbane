@@ -12,7 +12,7 @@ export async function onRequest({ request, env }) {
   const context = parseTrackingContext(body);
   if (!context.visitor_id || !context.session_id) return json({ ok:false, message:"Invalid visitor context." }, 400);
   try {
-    const result = await createLeadDraft(env, body);
+    const result = await createLeadDraft(env, body, request);
     return json({ ok:true, lead_id:result.lead_id });
   } catch (error) {
     console.error("Lead draft creation failed:", error && error.message);
