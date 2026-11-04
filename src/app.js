@@ -391,8 +391,15 @@
       }, extra || {});
     }
     function ga(name, params) {
-      // gtag config already sends the standard page_view automatically.
-      if (name !== "page_view" && typeof window.gtag === "function") window.gtag("event", name, params || {});
+      if (typeof window.gtag === "function") {
+        var safeParams = Object.assign({
+          page_location: location.origin + location.pathname,
+          page_title: document.title
+        }, params || {});
+        // Never send URL query strings to GA4; campaigns are captured separately.
+        safeParams.page_location = location.origin + location.pathname;
+        window.gtag("event", name, safeParams);
+      }
     }
     function startLead(source, formType) {
       var id = uuid();
@@ -404,7 +411,7 @@
     function event(name, extra) {
       var data = payload({ event_name: name, event_data: extra || {} });
       fetch("/api/track", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data), keepalive:true }).catch(function(){});
-      ga(name, Object.assign({ page_location: location.href, page_title: document.title }, extra || {}));
+      ga(name, extra || {});
     }
     return { payload:payload, event:event, startLead:startLead, ga:ga, visitorId:stored.visitor_id, sessionId:session.session_id };
   })();
