@@ -359,9 +359,9 @@ posted from a preview server such as `localhost:4173`, which has no Function).
 | `dist/_headers` | Security headers and cache policy. |
 | `dist/_redirects` | `www` → apex and common legacy paths. |
 | `dist/_routes.json` | Invokes Functions only for `/api/*`. |
-| `functions/api/quote.js` | Quote/contact endpoint. Uploaded by Git integration or Wrangler. |
+| `functions/api/quote.js` | Quote/contact endpoint; updates the matching draft lead after submission. |\n| `functions/api/lead-start.js` | Creates a quote lead draft on CTA click or form start. |\n| `functions/api/track.js` | Records allowlisted browser events. |\n| `functions/_lib/tracking.js` | Server-only Supabase access and sanitisation. |
 
-The site has **no database, no client-side router and no third-party scripts**. Form submissions are delivered by email/webhook and are not stored by the site.
+The site has no browser-side database client or client-side router. Google Analytics 4 is configured in rendered pages. Form submissions continue to be delivered through the configured email/webhook route. When Supabase tracking is configured, visitor activity and quote lead records are written by the server-side Pages Functions. See docs/TRACKING-SETUP.md.
 
 ---
 
@@ -407,7 +407,7 @@ The site has **no database, no client-side router and no third-party scripts**. 
 
 ### Measurement
 
-- [ ] Decide whether to add analytics. None is installed by default. If you add GA4 or another tool, update the privacy policy and add a consent mechanism where required.
+- [ ] Verify GA4 Measurement ID G-4LT7P577ZF in DebugView and confirm generate_lead is marked as a key event when ready.\n- [ ] Complete the Supabase and Apps Script setup in docs/TRACKING-SETUP.md. Test that a CTA-created draft is updated in place on form submission.\n- [ ] Review consent/privacy requirements and set a retention schedule for visitor and enquiry records.
 - [ ] Record call and quote enquiry volumes from launch week as the baseline.
 - [ ] Review Search Console queries after 28 days and update `docs/KEYWORD-MAP.md` if the intended page is not winning.
 
