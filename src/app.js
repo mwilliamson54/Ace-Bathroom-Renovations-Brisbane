@@ -374,9 +374,13 @@
       return { device_type: tablet ? "tablet" : mobile ? "mobile" : "desktop", browser_name: browser, operating_system: os, screen_width: screen.width || 0, screen_height: screen.height || 0, language: (navigator.language || "").slice(0,35), timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone || "").slice(0,80) };
     }
     function payload(extra) {
+      session.last_seen_at = new Date().toISOString();
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
       return Object.assign({
         visitor_id: stored.visitor_id,
         session_id: session.session_id,
+        visitor_created_at: stored.created_at,
+        session_started_at: session.started_at,
         page_url: location.href.slice(0, 2000),
         page_path: location.pathname.slice(0, 500),
         page_title: document.title.slice(0, 300),
@@ -389,12 +393,19 @@
     function ga(name, params) {
       if (typeof window.gtag === "function") window.gtag("event", name, params || {});
     }
+    function startLead(source, formType) {
+      var id = uuid();
+      try { sessionStorage.setItem("ace_pending_lead_id", id); } catch (_) {}
+      var data = payload({ lead_id:id, source:source || "website", form_type:formType || "quote" });
+      fetch("/api/lead-start", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data), keepalive:true }).catch(function(){});
+      return id;
+    }
     function event(name, extra) {
       var data = payload({ event_name: name, event_data: extra || {} });
       fetch("/api/track", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data), keepalive:true }).catch(function(){});
       ga(name, Object.assign({ page_location: location.href, page_title: document.title }, extra || {}));
     }
-    return { payload:payload, event:event, ga:ga, visitorId:stored.visitor_id, sessionId:session.session_id };
+    return { payload:payload, event:event, startLead:startLead, ga:ga, visitorId:stored.visitor_id, sessionId:session.session_id };
   })();
 
   /* ---------------- Page and interaction events ---------------- */
@@ -404,9 +415,10 @@
     if (!link) return;
     var href = link.getAttribute("href") || "";
     if (/^tel:/i.test(href)) {
-      ATTRIBUTION.event("call_click", { button_location: link.closest("header") ? "header" : link.closest("footer") ? "footer" : "content", link_text: (link.textContent || "").trim().slice(0,100) });
+      ATTRIBUTION.event("call_click", { button_location: link.closest("header") ? "header" : link.closest("footer") ? "footer" : "content", link_text: (link.textContent || "").trim().slice(0,100), phone_number:href.slice(4,50) });
     } else if (/get-a-quote|#quote-form/i.test(href)) {
       ATTRIBUTION.event("quote_click", { button_location: link.closest("header") ? "header" : link.closest(".hero") ? "hero" : link.closest(".cta-band") ? "cta_band" : "content", link_text: (link.textContent || "").trim().slice(0,100) });
+      ATTRIBUTION.startLead("quote-cta", "quote");
     }
   }, true);
   var scrollMilestones = {};
@@ -424,6 +436,7 @@
     var status = form.querySelector(".form-status") || $("#quote-status");
     var submit = form.querySelector('button[type="submit"]');
     var leadId = "";
+    try { leadId = sessionStorage.getItem("ace_pending_lead_id") || ""; } catch (_) {}
     var leadPromise = null;
     var started = false;
     function show(kind, html) {
@@ -433,10 +446,10 @@
     }
     function createLead() {
       if (leadPromise) return leadPromise;
-      ATTRIBUTION.event("quote_click", { form_type: form.id === "contact-form" ? "contact" : "quote", button_location: "form" });
+      if (!leadId) leadId = ATTRIBUTION.startLead((form.querySelector('[name="source"]')||{}).value || "website", form.id === "contact-form" ? "contact" : "quote");
       leadPromise = fetch("/api/lead-start", {
         method:"POST", headers:{"content-type":"application/json"},
-        body:JSON.stringify(ATTRIBUTION.payload({form_type:form.id === "contact-form" ? "contact" : "quote", source:(form.querySelector('[name="source"]')||{}).value || "website"}))
+        body:JSON.stringify(ATTRIBUTION.payload({lead_id:leadId,form_type:form.id === "contact-form" ? "contact" : "quote", source:(form.querySelector('[name="source"]')||{}).value || "website"}))
       }).then(function(r){return r.json().then(function(b){return {ok:r.ok,body:b};});})
         .then(function(r){ if(r.ok && r.body && r.body.ok) { leadId=r.body.lead_id; var hidden=form.querySelector('[name="lead_id"]'); if(!hidden){hidden=document.createElement("input");hidden.type="hidden";hidden.name="lead_id";form.appendChild(hidden);} hidden.value=leadId; } return leadId; })
         .catch(function(){ return ""; });
@@ -466,6 +479,7 @@
         if(result.ok && result.body.ok){
           ATTRIBUTION.event("generate_lead",{form_type:form.id,lead_status:"submitted"});
           form.reset(); leadId=""; leadPromise=null; started=false;
+          try { sessionStorage.removeItem("ace_pending_lead_id"); } catch (_) {}
           show("success",result.body.message || "Thanks — your enquiry has been received. We will be in touch shortly.");
         } else {
           ATTRIBUTION.event("form_error",{form_type:form.id});
