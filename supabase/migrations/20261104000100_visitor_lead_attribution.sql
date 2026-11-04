@@ -53,6 +53,7 @@ create table if not exists public.ace_quote_leads (
   page_path text,
   page_title text,
   referrer text,
+  country_code text,
   first_touch jsonb not null default '{}'::jsonb,
   last_touch jsonb not null default '{}'::jsonb,
   device jsonb not null default '{}'::jsonb,
