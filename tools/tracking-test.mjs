@@ -45,6 +45,10 @@ const env = {
 };
 
 const realFetch = globalThis.fetch;
+const addCloudflareCountry = (request) => {
+  Object.defineProperty(request, "cf", { value: { country: "AU" } });
+  return request;
+};
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
   const method = init.method || "GET";
@@ -70,7 +74,7 @@ globalThis.fetch = async (input, init = {}) => {
 try {
   const requestContext = { cf: { country: "AU" } };
 
-  const startRequest = new Request("https://acebathroomrenovationsbrisbane.com/api/lead-start", {
+  const startRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/lead-start", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -79,8 +83,8 @@ try {
       source: "quote-cta",
       form_type: "quote"
     })
-  });
-  const startResponse = await leadStart({ request: startRequest, env, ...requestContext });
+  }));
+  const startResponse = await leadStart({ request: startRequest, env });
   const startBody = await startResponse.json();
   assert.equal(startResponse.status, 200);
   assert.equal(startBody.ok, true);
@@ -96,7 +100,7 @@ try {
   assert.equal(startLeadInsert.headers.apikey, env.SUPABASE_SECRET_KEY);
   assert.ok(!("authorization" in startLeadInsert.headers), "opaque sb_secret key must not be used as a Bearer JWT");
 
-  const eventRequest = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
+  const eventRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -104,8 +108,8 @@ try {
       event_name: "call_click",
       event_data: { button_location: "header", phone_number: "+61785906941" }
     })
-  });
-  const eventResponse = await track({ request: eventRequest, env, ...requestContext });
+  }));
+  const eventResponse = await track({ request: eventRequest, env });
   assert.equal(eventResponse.status, 200);
   assert.equal((await eventResponse.json()).ok, true);
   assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_events") && call.body.event_name === "call_click"));
@@ -126,11 +130,11 @@ try {
   form.set("lead_id", leadId);
   form.set("tracking_context", JSON.stringify(context));
 
-  const quoteRequest = new Request("https://acebathroomrenovationsbrisbane.com/api/quote", {
+  const quoteRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/quote", {
     method: "POST",
     body: form
-  });
-  const quoteResponse = await quote({ request: quoteRequest, env, ...requestContext });
+  }));
+  const quoteResponse = await quote({ request: quoteRequest, env });
   const quoteBody = await quoteResponse.json();
   assert.equal(quoteResponse.status, 200);
   assert.equal(quoteBody.ok, true);
