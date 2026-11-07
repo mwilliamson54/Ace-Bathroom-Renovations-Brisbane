@@ -19,8 +19,8 @@ const quoteFaqs = [
     a: "Yes. We provide a free on-site measure and written quote for bathroom, ensuite, laundry and kitchen projects within our Greater Brisbane service area. There is no obligation to proceed and no charge for the initial conversation.",
   },
   {
-    q: "What happens after I submit the form?",
-    a: "We review your details and call you, usually within one business day and often sooner. We will ask about the room, the property, your timing and your budget, then arrange an on-site measure if the project looks like a fit. If we are not the right builder, we will tell you.",
+    q: "What happens when I contact you?",
+    a: "When you call or email, we respond personally, usually within one business day and often sooner. We will ask about the room, the property, your timing and your budget, then arrange an on-site measure if the project looks like a fit. If we are not the right builder, we will tell you.",
   },
   {
     q: "What should I have ready for the measure?",
@@ -57,79 +57,16 @@ const timelineOptions = [
   "Just researching",
 ];
 
-function quoteForm(source = "quote-page") {
-  return `<form class="form-card" id="quote-form" action="/api/quote" method="post" novalidate>
-    <input type="hidden" name="source" value="${source}">
-    <div class="hp-field" aria-hidden="true">
-      <label for="quote-ax-hp">Leave this field empty</label>
-      <input type="text" id="quote-ax-hp" name="ax_hp" tabindex="-1" autocomplete="off" data-lpignore="true">
-    </div>
-    <div class="form-grid form-grid--2">
-      <div class="field">
-        <label for="quote-name">Your name <span class="req">*</span></label>
-        <input type="text" id="quote-name" name="name" autocomplete="name" required maxlength="80" placeholder="First and last name">
-      </div>
-      <div class="field">
-        <label for="quote-phone">Phone <span class="req">*</span></label>
-        <input type="tel" id="quote-phone" name="phone" autocomplete="tel" required maxlength="30" placeholder="04XX XXX XXX">
-        <span class="field__hint">We will call you to discuss the project.</span>
-      </div>
-      <div class="field">
-        <label for="quote-email">Email</label>
-        <input type="email" id="quote-email" name="email" autocomplete="email" maxlength="120" placeholder="you@example.com">
-      </div>
-      <div class="field">
-        <label for="quote-suburb">Suburb <span class="req">*</span></label>
-        <input type="text" id="quote-suburb" name="suburb" autocomplete="address-level2" required maxlength="60" placeholder="e.g. Chermside">
-      </div>
-      <div class="field">
-        <label for="quote-property">Property type</label>
-        <select id="quote-property" name="property">
-          <option value="house">House</option>
-          <option value="townhouse">Townhouse</option>
-          <option value="apartment">Apartment</option>
-          <option value="duplex">Duplex or unit</option>
-          <option value="commercial">Commercial</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="quote-project">Project type</label>
-        <select id="quote-project" name="project">
-          ${services.map((s) => `<option value="${s.slug}">${s.name}</option>`).join("")}
-          <option value="multiple">More than one room</option>
-          <option value="not-sure">Not sure yet</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="quote-budget">Approximate budget</label>
-        <select id="quote-budget" name="budget">
-          ${budgetOptions.map((b) => `<option value="${b}">${b}</option>`).join("")}
-        </select>
-      </div>
-      <div class="field">
-        <label for="quote-timeline">Preferred timing</label>
-        <select id="quote-timeline" name="timeline">
-          ${timelineOptions.map((t) => `<option value="${t}">${t}</option>`).join("")}
-        </select>
-      </div>
-      <div class="field field--full">
-        <label for="quote-message">Tell us about the room</label>
-        <textarea id="quote-message" name="message" maxlength="2000" placeholder="Room size, what is not working, layout changes, access notes, body corporate or heritage requirements."></textarea>
-      </div>
-      <div class="field field--full">
-        <label class="form-consent">
-          <input type="checkbox" name="consent" value="yes" required>
-          <span>I agree to be contacted about this enquiry and have read the <a href="/privacy-policy/">Privacy Policy</a>. <span class="req">*</span></span>
-        </label>
-      </div>
-    </div>
+function contactOfflineCard(id = "contact-options") {
+  return `<div class="form-card" id="${id}" aria-labelledby="${id}-title">
+    <p class="eyebrow">Online form unavailable</p>
+    <h2 id="${id}-title">Contact us directly</h2>
+    <p class="lead">The online form is not connected right now. Please call <a href="${tel}">${site.phoneDisplay}</a> or email <a href="${mail}">${site.email}</a> and we will respond personally.</p>
     <div class="btn-group" style="margin-top:18px">
-      <button class="btn btn-primary btn-lg" type="submit">Request my quote</button>
-      <a class="btn btn-outline btn-lg" href="${tel}">${icons.phone(17)} Call instead</a>
+      <a class="btn btn-primary btn-lg" href="${tel}">${icons.phone(17)} Call ${site.phoneDisplay}</a>
+      <a class="btn btn-outline btn-lg" href="${mail}">${icons.mail(17)} Email us</a>
     </div>
-    <div class="form-status" id="quote-status" role="status" aria-live="polite"></div>
-    <p class="calc-note" style="margin-top:14px">We use your details only to respond to this enquiry. Your information stays with our team and is never shared for marketing.</p>
-  </form>`;
+  </div>`;
 }
 
 export function renderQuote() {
@@ -140,9 +77,9 @@ ${hero({
   eyebrow: "Get a quote",
   h1: "Request a bathroom renovation quote",
   lead:
-    "Tell us about the room and we will call to discuss the scope, budget and timing before arranging a free on-site measure. No call centre, no lead selling, no pressure.",
+    "The online form is not connected right now. Call or email us to discuss your bathroom renovation and arrange a free on-site measure. We will respond personally.",
   primary: { href: tel, label: `Call ${site.phoneDisplay}` },
-  secondary: { href: "#quote-form", label: "Send your details" },
+  secondary: { href: mail, label: "Email us" },
   trust: ["Free on-site measure", "Written itemised quote", "QBCC licensed builder", "Open 7am–10pm, 7 days"],
   card: `<p><strong>Need an answer now?</strong> Call <a href="${tel}">${site.phoneDisplay}</a>. We answer seven days a week, 7am to 10pm.</p>`,
   page: true,
@@ -166,7 +103,7 @@ ${trustStrip()}
         <div class="notice" style="margin-top:18px"><strong>What happens next.</strong> We review your enquiry, call you to discuss the room and arrange a time to inspect it. The measure usually takes 45–60 minutes. You receive a written quote after we have checked the substrate, plumbing, ventilation and access.</div>
       </div>
       <div>
-        ${quoteForm("quote-page")}
+        ${contactOfflineCard("contact-options")}
       </div>
     </div>
   </div>
@@ -280,7 +217,7 @@ ${ctaBand({
 const contactFaqs = [
   {
     q: "What is the best way to contact you?",
-    a: "Call during opening hours for the fastest response. We answer seven days a week, 7am to 10pm. If you prefer to write, email us or use the contact form and we will reply as soon as we can, usually within one business day.",
+    a: "Call during opening hours for the fastest response. We answer seven days a week, 7am to 10pm. You can also email us and we will reply as soon as we can, usually within one business day.",
   },
   {
     q: "Where are you based?",
@@ -292,7 +229,7 @@ const contactFaqs = [
   },
   {
     q: "How quickly will you respond?",
-    a: "Calls are answered during opening hours. Form and email enquiries are usually reviewed within one business day. If your matter is urgent, call us rather than relying on the form.",
+    a: "Calls are answered during opening hours. Emails are usually reviewed within one business day. If your matter is urgent, call us rather than relying on email.",
   },
   {
     q: "Can I visit your office?",
@@ -312,9 +249,9 @@ ${hero({
   eyebrow: "Contact us",
   h1: "Contact Ace Bathroom Renovations Brisbane",
   lead:
-    "Call, email or send a message. We answer seven days a week and will give you a straightforward answer about scope, budget and timing.",
+    "Call or email us. We answer seven days a week and will give you a straightforward answer about scope, budget and timing.",
   primary: { href: tel, label: `Call ${site.phoneDisplay}` },
-  secondary: { href: "#contact-form", label: "Send a message" },
+  secondary: { href: mail, label: "Email us" },
   trust: ["Open 7am–10pm, 7 days", "Brisbane mobile service", "QBCC licensed builder", "Free on-site measure"],
   card: `<p><strong>Call now:</strong> <a href="${tel}">${site.phoneDisplay}</a><br><strong>Email:</strong> <a href="${mail}">${site.email}</a></p>`,
   page: true,
@@ -327,7 +264,7 @@ ${trustStrip()}
       <div>
         <p class="eyebrow">Talk to us</p>
         <h2>One number, one team, seven days</h2>
-        <p class="lead">The fastest way to get an answer is to call. If you cannot talk now, send a message and we will come back to you.</p>
+        <p class="lead">The fastest way to get an answer is to call. If you cannot talk now, email us and we will come back to you personally.</p>
         <div class="contact-methods">
           <div class="contact-method">${icons.phone(22)}<div><strong>Phone</strong><a href="${tel}">${site.phoneDisplay}</a></div></div>
           <div class="contact-method">${icons.mail(22)}<div><strong>Email</strong><a href="${mail}">${site.email}</a></div></div>
@@ -340,47 +277,7 @@ ${trustStrip()}
         <p>We do not use a call centre, sell your enquiry or pass you to another contractor. The person who answers is part of the team accountable for the work.</p>
       </div>
       <div>
-        <form class="form-card" id="contact-form" action="/api/quote" method="post" novalidate>
-          <input type="hidden" name="source" value="contact-page">
-          <div class="hp-field" aria-hidden="true">
-            <label for="contact-ax-hp">Leave this field empty</label>
-            <input type="text" id="contact-ax-hp" name="ax_hp" tabindex="-1" autocomplete="off" data-lpignore="true">
-          </div>
-          <div class="form-grid form-grid--2">
-            <div class="field">
-              <label for="contact-name">Your name <span class="req">*</span></label>
-              <input type="text" id="contact-name" name="name" autocomplete="name" required maxlength="80">
-            </div>
-            <div class="field">
-              <label for="contact-phone">Phone <span class="req">*</span></label>
-              <input type="tel" id="contact-phone" name="phone" autocomplete="tel" required maxlength="30">
-            </div>
-            <div class="field">
-              <label for="contact-email">Email</label>
-              <input type="email" id="contact-email" name="email" autocomplete="email" maxlength="120">
-            </div>
-            <div class="field">
-              <label for="contact-suburb">Suburb</label>
-              <input type="text" id="contact-suburb" name="suburb" autocomplete="address-level2" maxlength="60">
-            </div>
-            <div class="field field--full">
-              <label for="contact-message">Message <span class="req">*</span></label>
-              <textarea id="contact-message" name="message" required maxlength="2000" placeholder="How can we help?"></textarea>
-            </div>
-            <div class="field field--full">
-              <label class="form-consent">
-                <input type="checkbox" name="consent" value="yes" required>
-                <span>I agree to be contacted about this enquiry and have read the <a href="/privacy-policy/">Privacy Policy</a>. <span class="req">*</span></span>
-              </label>
-            </div>
-          </div>
-          <div class="btn-group" style="margin-top:18px">
-            <button class="btn btn-primary btn-lg" type="submit">Send message</button>
-            <a class="btn btn-outline btn-lg" href="${tel}">${icons.phone(17)} Call now</a>
-          </div>
-          <div class="form-status" id="quote-status" role="status" aria-live="polite"></div>
-          <p class="calc-note" style="margin-top:14px">We use your details only to respond to this enquiry and do not share them with other contractors.</p>
-        </form>
+        ${contactOfflineCard("contact-options")}
       </div>
     </div>
   </div>
@@ -410,7 +307,7 @@ ${ctaBand({
     path: "/contact/",
     title: "Contact Ace Bathrooms Brisbane | Call (07) 8590 6941",
     description:
-      "Contact Ace Bathroom Renovations Brisbane. Call (07) 8590 6941, email us or send a message. Open 7am–10pm, seven days. Mobile service across Greater Brisbane.",
+      "Contact Ace Bathroom Renovations Brisbane. Call (07) 8590 6941 or email us. Open 7am–10pm, seven days. Mobile service across Greater Brisbane.",
     image: images.apartment,
     body,
     crumbs: [{ name: "Contact", url: "/contact/" }],
