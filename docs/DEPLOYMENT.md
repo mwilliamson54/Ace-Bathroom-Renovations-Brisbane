@@ -75,43 +75,23 @@ git push origin main
 
 The first deployment will be available at `https://ace-bathroom-renovations-brisbane.pages.dev`. The `functions/` folder is detected automatically because it sits at the repository root, not inside `dist/`.
 
-### 2.3 Add the form environment variables
+### 2.3 Configure the Google Apps Script relay
 
-In **Workers & Pages → your project → Settings → Environment variables**, add the following to **both Production and Preview**:
+In **Workers & Pages → your project → Settings → Variables and Secrets**, add this as an encrypted secret in **both Production and Preview**:
 
-| Variable | Type | Required | Example / notes |
+| Variable | Type | Required | Value |
 | --- | --- | --- | --- |
-| `RESEND_API_KEY` | Secret | For email | Create at <https://resend.com/api-keys>. Never commit it. |
-| `QUOTE_TO_EMAIL` | Plain text | For email | `AceBathroomRenovationsBrisbane@gmail.com` |
-| `QUOTE_FROM_EMAIL` | Plain text | For email | `website@acebathroomrenovationsbrisbane.com` — must be on a domain verified in Resend. Until then, `onboarding@resend.dev` works as an interim sender (owner inbox only). |
-| `QUOTE_WEBHOOK_URL` | Secret (optional) | Optional | HTTPS endpoint that accepts a JSON `POST`, including any token it needs in the query string (e.g. the Gmail relay's `…/exec?token=…`). |
+| `QUOTE_WEBHOOK_URL` | Secret | Yes | The deployed Google Apps Script `/exec` URL with its shared token in the query string. |
 
-You can configure **email**, **webhook**, or **both**. The Function attempts every configured channel concurrently and succeeds if at least one delivery succeeds.
+The destination inbox, sender identity and Google Sheet are configured in `integrations/google-apps-script/Code.gs`, not in Cloudflare. Google Apps Script sends the email from the Google account that owns the deployment and appends a backup row to its Sheet.
 
-If **none** of the channels are configured, `/api/quote` returns **HTTP 503** with a phone/email fallback. This is intentional: the site never tells a visitor their enquiry was received when it was not.
+**Apps Script is the only quote-email route.** The Pages Function does not send through Resend and does not fall back to another mail provider if the relay is missing or unavailable. If the secret is missing, the form returns HTTP 503. If the relay returns an error or rejects the token, the form returns HTTP 502 rather than showing a false success message.
 
-After adding or changing variables, **redeploy** (or use **Retry deployment**) so the Function picks them up.
+After adding or changing the secret, redeploy (or use **Retry deployment**) so the Function picks it up.
 
-### 2.4 Verify the Resend sending domain
+### 2.4 Set up the Apps Script relay
 
-1. In Resend, add `acebathroomrenovationsbrisbane.com` as a domain.
-2. Add the DNS records Resend provides (SPF, DKIM and, if shown, DMARC) in Cloudflare DNS.
-3. Wait for verification to complete.
-4. Set `QUOTE_FROM_EMAIL` to an address on that verified domain, for example `website@acebathroomrenovationsbrisbane.com`.
-5. Send a test enquiry from the live site and confirm it arrives at `QUOTE_TO_EMAIL`.
-
-Notes:
-
-- `reply_to` is set to the enquirer's email, so replying from the inbox goes straight back to them.
-- Resend's shared `onboarding@resend.dev` sender only delivers to the Resend account owner's address. Use a verified domain for production.
-- Do not remove existing MX records for a live mailbox. Resend sending records are separate from inbox hosting.
-
-#### Interim sender before the domain is verified
-
-If the form must go live before the custom domain exists, set
-`QUOTE_FROM_EMAIL=onboarding@resend.dev`. Resend accepts it without domain verification, but it
-will only deliver to the address that owns the Resend account, so `QUOTE_TO_EMAIL` must be that
-same inbox. Switch to the verified `website@` sender as soon as DNS is live, then redeploy.
+Follow section 3.8 below. Verify that the Apps Script URL answers with the expected service JSON before setting it as the Cloudflare secret.
 
 ### 2.5 Connect the custom domain
 
@@ -249,70 +229,37 @@ project migration is needed.
 npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane --branch preview
 ```
 
-### 3.7 Set secrets and variables
+### 3.7 Set the Apps Script secret
+
+Set `QUOTE_WEBHOOK_URL` as an encrypted Pages secret for both Production and Preview:
 
 ```sh
-npx wrangler pages secret put RESEND_API_KEY --project-name ace-bathroom-renovations-brisbane
 npx wrangler pages secret put QUOTE_WEBHOOK_URL --project-name ace-bathroom-renovations-brisbane
 ```
 
-Add `QUOTE_TO_EMAIL` and `QUOTE_FROM_EMAIL` in the dashboard under **Settings → Environment variables** for both environments, then redeploy.
-
-The custom domain and Resend verification steps are the same as Option A.
+Paste the full Apps Script Web App URL ending in `/exec?token=…` when prompted. Do not commit this URL or its token to GitHub.
 
 ### 3.8 Gmail relay (Google Apps Script)
 
-The form posts to `/api/quote`, which delivers in parallel to every configured channel:
+The deployed script in `integrations/google-apps-script/Code.gs` is the **required and only production quote-email route**. It runs in the business's Google account, sends the enquiry email from that account, and appends a backup row to a Google Sheet.
 
-| Channel | Env var | Notes |
-| --- | --- | --- |
-| Resend | `RESEND_API_KEY`, `QUOTE_TO_EMAIL`, `QUOTE_FROM_EMAIL` | Works immediately, but on `onboarding@resend.dev` the shared test domain is often spam-filtered by Gmail. |
-| JSON webhook | `QUOTE_WEBHOOK_URL` | Generic; any endpoint that accepts the enquiry as JSON. |
-| KV archive | `QUOTE_LOG` (KV binding) | Every submission is stored for 90 days with its outcome and, on success, the Resend message id. |
+Setup:
 
-Until a domain is verified in Resend, the reliable route is the Gmail relay in
-`integrations/google-apps-script/Code.gs`. It runs inside the business's own Google account, so
-enquiries arrive as ordinary mail from that account with no third-party sender reputation involved,
-and every enquiry is also appended to a Google Sheet.
+1. Open <https://script.google.com> and create a project named `Ace quote relay`.
+2. Replace the editor contents with the repository's `integrations/google-apps-script/Code.gs` and save.
+3. In `CONFIG.toEmail`, confirm the destination inbox is correct.
+4. Replace `CONFIG.sharedToken` with a long random token. Do not leave the default `CHANGE-ME` value.
+5. **Deploy → New deployment → Web app**. Set *Execute as* to **Me** and *Who has access* to **Anyone**.
+6. Copy the Web App URL ending in `/exec` and append `?token=YOUR_TOKEN`.
+7. Open that URL in a browser. It should return `{"ok":true,"service":"ace-quote-relay"}`.
+8. Add the full URL to Cloudflare Pages as the encrypted `QUOTE_WEBHOOK_URL` secret in both Production and Preview.
+9. Redeploy and submit a test enquiry. Confirm the email arrives and the Google Sheet receives a new row.
 
-Setup (about five minutes):
+The script verifies the token before processing the request. It emails first and then archives the enquiry; if the Sheet fails, it reports the Sheet failure while preserving the email. The Cloudflare Function treats a response of `{"ok":false}` as a failed delivery.
 
-1. Open <https://script.google.com> → **New project**, name it `Ace quote relay`.
-2. Replace the contents of `Code.gs` with `integrations/google-apps-script/Code.gs` and save.
-3. Change `CONFIG.sharedToken` to a long random string, URL-safe (`A-Z a-z 0-9 - _` only, no
-   `&`, `#`, `+` or spaces — it is pasted into a query string). While it still reads `CHANGE-ME`
-   the script rejects every request, so a half-finished deployment is never an open relay.
-4. Check `CONFIG.toEmail` is the inbox that should receive enquiries.
-5. **Deploy → New deployment → Web app**. Set *Execute as* = **Me**, *Who has access* = **Anyone**.
-   Authorise the script when prompted (Sheets + Gmail scopes).
-6. Copy the web app URL (it ends in `/exec`) and append `?token=YOUR_TOKEN`.
-7. Open that URL in a browser. It should return `{"ok":true,"service":"ace-quote-relay"}` — that
-   confirms the deployment is live before the site depends on it.
-8. Set it as the Pages secret and redeploy (see below).
-9. Submit one test through the form and confirm it arrives in the inbox **and** in the sheet.
+**Delivery rules:** Apps Script is the only configured delivery path. Resend is not attempted as a second provider or fallback. A missing relay returns 503; a relay rejection or outage returns 502, with a phone/email fallback shown to the visitor.
 
-The script does not need to be bound to a spreadsheet. On the first enquiry it creates
-`Ace Bathroom Renovations — enquiries`, remembers the file id in Script Properties, and appends one
-row per lead. If the sheet fails, the email is still sent — the response reports
-`"sheet":"failed: …"` so the archive problem is visible rather than silent.
-
-Setting the secret:
-
-```sh
-# Git-integration project (current setup)
-npx wrangler pages secret put QUOTE_WEBHOOK_URL --project-name ace-bathroom-renovations-brisbane
-# paste the full https://script.google.com/macros/s/…/exec?token=… value when prompted
-```
-
-Set it for **both** production and preview, then redeploy — Pages snapshots the environment at
-deploy time, so an existing deployment keeps the old values until a new one is created.
-
-Delivery rules: Resend and the relay are attempted in parallel and the form succeeds if **either**
-delivers. A relay that answers `{"ok":false}` (wrong token, mail quota, script error) counts as a
-failure, not a success, so the visitor is told to phone rather than being shown a false confirmation.
-
-Names, phone numbers and message bodies are deliberately never written to the Worker log stream;
-they are only ever stored in KV, in the Sheet and in the delivered email.
+Names, phone numbers and message bodies are deliberately not written to the Cloudflare Worker log stream. They are held in the quote record, the Google Sheet and the delivered email. Do not log or expose the Apps Script token.
 
 ### 3.9 Diagnosing a missing enquiry
 
@@ -359,9 +306,9 @@ posted from a preview server such as `localhost:4173`, which has no Function).
 | `dist/_headers` | Security headers and cache policy. |
 | `dist/_redirects` | `www` → apex and common legacy paths. |
 | `dist/_routes.json` | Invokes Functions only for `/api/*`. |
-| `functions/api/quote.js` | Quote/contact endpoint. Uploaded by Git integration or Wrangler. |
+| `functions/api/quote.js` | Quote/contact endpoint; updates the matching draft lead after submission. |\n| `functions/api/lead-start.js` | Creates a quote lead draft on CTA click or form start. |\n| `functions/api/track.js` | Records allowlisted browser events. |\n| `functions/_lib/tracking.js` | Server-only Supabase access and sanitisation. |
 
-The site has **no database, no client-side router and no third-party scripts**. Form submissions are delivered by email/webhook and are not stored by the site.
+The site has no browser-side database client or client-side router. Google Analytics 4 is configured in rendered pages. Form submissions continue to be delivered through the configured email/webhook route. When Supabase tracking is configured, visitor activity and quote lead records are written by the server-side Pages Functions. See docs/TRACKING-SETUP.md.
 
 ---
 
@@ -407,7 +354,7 @@ The site has **no database, no client-side router and no third-party scripts**. 
 
 ### Measurement
 
-- [ ] Decide whether to add analytics. None is installed by default. If you add GA4 or another tool, update the privacy policy and add a consent mechanism where required.
+- [ ] Verify GA4 Measurement ID G-4LT7P577ZF in DebugView and confirm generate_lead is marked as a key event when ready.\n- [ ] Complete the Supabase and Apps Script setup in docs/TRACKING-SETUP.md. Test that a CTA-created draft is updated in place on form submission.\n- [ ] Review consent/privacy requirements and set a retention schedule for visitor and enquiry records.
 - [ ] Record call and quote enquiry volumes from launch week as the baseline.
 - [ ] Review Search Console queries after 28 days and update `docs/KEYWORD-MAP.md` if the intended page is not winning.
 
@@ -437,8 +384,8 @@ npx wrangler pages deploy dist --project-name ace-bathroom-renovations-brisbane 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | Site loads but form returns 404 | Functions were not deployed (dashboard drag-and-drop, or Wrangler run outside the repo root). | Use Git integration, or run `npx wrangler pages deploy dist` from the repository root. Confirm `functions/api/quote.js` exists in the repo. |
-| Form returns 503 with phone/email fallback | No delivery channel configured. | Set `RESEND_API_KEY`, `QUOTE_TO_EMAIL` and `QUOTE_FROM_EMAIL`, or `QUOTE_WEBHOOK_URL`; redeploy. |
-| Form returns 502 | Resend rejected the message or the webhook failed. | Check Functions logs. Verify the sending domain, that `QUOTE_FROM_EMAIL` uses that domain, and that the API key is valid. |
+| Form returns 503 with phone/email fallback | `QUOTE_WEBHOOK_URL` is missing. | Set the Apps Script Web App URL and token as the encrypted `QUOTE_WEBHOOK_URL` secret in the current environment, then redeploy. |
+| Form returns 502 | Apps Script rejected the shared token, hit a mail quota, or failed to send. | Check the Apps Script deployment, `CONFIG.sharedToken`, `CONFIG.toEmail`, and Apps Script execution logs. |
 | Email goes to spam | SPF/DKIM/DMARC incomplete, or a new domain. | Complete Resend DNS verification, send from the verified domain, warm up gradually. |
 | `www` does not redirect | `www` is not attached to the Pages project. | Add `www` as a custom domain; keep the `_redirects` rule. |
 | Stale HTML after deploy | Browser or intermediary cache. | HTML is `max-age=0, must-revalidate`; hard-refresh. Check you are on the latest deployment. |

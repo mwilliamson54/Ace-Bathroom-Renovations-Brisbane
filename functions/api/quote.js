@@ -1,14 +1,14 @@
+import { parseTrackingContext, saveSubmittedLead, updateLeadDelivery } from "../_lib/tracking.js";
+
 /**
  * Cloudflare Pages Function — POST /api/quote
  *
- * Environment variables (set in the Cloudflare Pages dashboard):
- *   RESEND_API_KEY     Resend API key (optional)
- *   QUOTE_TO_EMAIL     Destination inbox, e.g. AceBathroomRenovationsBrisbane@gmail.com
- *   QUOTE_FROM_EMAIL   Verified sender, e.g. website@acebathroomrenovationsbrisbane.com
- *   QUOTE_WEBHOOK_URL  Optional JSON webhook (Slack/Notion/Zapier/custom CRM)
+ * Required Cloudflare Pages environment variable:
+ *   QUOTE_WEBHOOK_URL  Google Apps Script Web App URL with its shared token
  *
- * If no delivery channel is configured, the endpoint returns a clear phone/email
- * fallback instead of pretending the enquiry was delivered.
+ * Google Apps Script is the only production email route. If it is missing or
+ * rejects a submission, the endpoint returns an error rather than falling back
+ * to a different mail provider or claiming that the enquiry was delivered.
  */
 
 const MAX_BODY_BYTES = 32 * 1024;
@@ -52,6 +52,9 @@ function fieldsFrom(form) {
     timeline: get("timeline", 80),
     message: get("message", 2000),
     source: get("source", 60),
+    formType: get("form_type", 40),
+    leadId: get("lead_id", 36),
+    trackingContext: String(form.get("tracking_context") || "").slice(0, 12000),
     consent: form.get("consent") === "yes" || form.get("consent") === "on",
     honeypot: get("ax_hp", 200) || get("company_website", 200),
   };
@@ -110,43 +113,15 @@ function enquiryHtml(data) {
   </body></html>`;
 }
 
-async function sendWithResend(env, data) {
-  const apiKey = env.RESEND_API_KEY;
-  const to = env.QUOTE_TO_EMAIL;
-  const from = env.QUOTE_FROM_EMAIL;
-  if (!apiKey || !to || !from) return { skipped: true };
-
-  const payload = {
-    from,
-    // Send a plain string (Resend's test-sender restriction rejects a one-item
-    // array) and lower-case it: Resend compares the recipient against the account
-    // owner's address case-sensitively, so a capitalised QUOTE_TO_EMAIL fails
-    // with 403 while the same address in lower case is accepted.
-    to: to.trim().toLowerCase(),
-    subject: `${data.subjectPrefix || ""}Website enquiry: ${data.name} — ${data.suburb}`,
-    text: enquiryText(data),
-    html: enquiryHtml(data),
-  };
-  if (data.email) payload.reply_to = data.email;
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Resend ${res.status}: ${detail.slice(0, 300)}`);
-  }
-  const body = await res.json().catch(() => ({}));
-  return { sent: true, id: body && body.id ? String(body.id) : "" };
-}
-
 async function sendWebhook(env, data) {
   if (!env.QUOTE_WEBHOOK_URL) return { skipped: true };
+  // Only pass the enquiry fields needed by the relay. Visitor IDs, session IDs
+  // and campaign attribution remain in Supabase and are not sent to Apps Script.
+  const {
+    leadId: _leadId,
+    trackingContext: _trackingContext,
+    ...enquiry
+  } = data;
   const res = await fetch(env.QUOTE_WEBHOOK_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -154,7 +129,7 @@ async function sendWebhook(env, data) {
       type: "quote_enquiry",
       site: "acebathroomrenovationsbrisbane.com",
       receivedAt: new Date().toISOString(),
-      ...data,
+      ...enquiry,
       honeypot: undefined,
     }),
   });
@@ -210,6 +185,8 @@ async function handlePost(context) {
   }
 
   const data = fieldsFrom(form);
+  const trackingContext = parseTrackingContext(data.trackingContext);
+  let trackingLeadId = "";
 
   // Diagnostic trail. Deliberately logs no names, phone numbers, emails or message
   // bodies: only field presence and the delivery outcome.
@@ -239,6 +216,18 @@ async function handlePost(context) {
       country: (request.cf && request.cf.country) || "",
       ...extra,
     });
+    if (trackingLeadId) {
+      const deliveryStatus = outcome === "delivered" ? "delivered" :
+        outcome === "not_configured" ? "not_configured" : "failed";
+      try {
+        await updateLeadDelivery(
+          env, trackingLeadId, trackingContext && trackingContext.visitor_id,
+          deliveryStatus, extra.deliveryError || "", extra.resendId || ""
+        );
+      } catch (error) {
+        console.error("Supabase delivery status update failed:", error && error.message);
+      }
+    }
     return response;
   };
 
@@ -261,7 +250,30 @@ async function handlePost(context) {
     return finish(json({ ok: false, message: errors[0] }, 422), "invalid", { error: errors[0] });
   }
 
-  const configured = Boolean(env.RESEND_API_KEY && env.QUOTE_TO_EMAIL && env.QUOTE_FROM_EMAIL) || Boolean(env.QUOTE_WEBHOOK_URL);
+  // Save the completed form against the click-created draft. Database failures
+  // are logged but never block the existing email/webhook delivery path.
+  try {
+    trackingLeadId = await saveSubmittedLead(env, {
+      lead_id: data.leadId,
+      tracking_context: data.trackingContext,
+      source: data.source,
+      form_type: data.formType || (data.source === "contact-page" ? "contact" : "quote"),
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      suburb: data.suburb,
+      property: data.property,
+      project: data.project,
+      budget: data.budget,
+      timeline: data.timeline,
+      message: data.message,
+      consent: data.consent,
+    }, request);
+  } catch (error) {
+    console.error("Supabase lead save failed:", error && error.message);
+  }
+
+  const configured = Boolean(env.QUOTE_WEBHOOK_URL);
   if (!configured) {
     return finish(
       json(
@@ -276,7 +288,9 @@ async function handlePost(context) {
     );
   }
 
-  const results = await Promise.allSettled([sendWithResend(env, data), sendWebhook(env, data)]);
+  // Google Apps Script is the required production delivery route.
+  // Do not silently fall back to another provider if the relay is missing or down.
+  const results = await Promise.allSettled([sendWebhook(env, data)]);
   const delivered = results.some((r) => r.status === "fulfilled" && r.value && r.value.sent);
 
   if (!delivered) {
@@ -307,6 +321,7 @@ async function handlePost(context) {
     json({
       ok: true,
       message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
+      lead_id: trackingLeadId || null,
     }),
     "delivered",
     { resendId }
