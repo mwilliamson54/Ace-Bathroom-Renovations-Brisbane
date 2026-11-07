@@ -11,6 +11,7 @@ import {
   mapSection,
   icons,
   tel,
+  mail,
 } from "../lib/layout.mjs";
 
 const homeFaqs = [
@@ -59,7 +60,7 @@ ${hero({
   primary: { href: "/get-a-quote/", label: "Get a free quote" },
   secondary: { href: tel, label: `Call ${site.phoneDisplay}` },
   trust: ["QBCC licensed builder", "AS 3740 waterproofing", "Fixed written quote", "Open 7am–10pm, 7 days"],
-  card: `<p><strong>Talk to a builder, not a call centre.</strong> Call <a href="${tel}">${site.phoneDisplay}</a> or send your details for an on-site measure and written quote.</p>`,
+  card: `<p><strong>Talk to a builder, not a call centre.</strong> Call <a href="${tel}">${site.phoneDisplay}</a> or <a href="${mail}">email us</a> for an on-site measure and written quote.</p>`,
 })}
 ${trustStrip()}
 
