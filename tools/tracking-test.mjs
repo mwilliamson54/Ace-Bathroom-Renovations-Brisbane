@@ -155,6 +155,11 @@ try {
   assert.equal(quoteBody.status, "processing");
   assert.equal(quoteBody.lead_id, leadId);
   assert.equal(backgroundTasks.length, 1, "fulfillment should be registered with waitUntil");
+  // The background processor first upserts visitor/session/lead rows. Let those
+  // microtasks reach the deliberately delayed Apps Script relay.
+  for (let i = 0; i < 30 && !calls.some((call) => call.url.includes("script.google.com")); i++) {
+    await Promise.resolve();
+  }
   assert.equal(calls.filter((call) => call.url.includes("script.google.com")).length, 1, "relay should be scheduled in the background");
 
   // Release the deliberately delayed relay and await the post-response work.
