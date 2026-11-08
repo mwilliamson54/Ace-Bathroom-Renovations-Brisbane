@@ -84,6 +84,36 @@ function safeTouch(value) {
   };
 }
 
+function isValidIpAddress(value) {
+  const ip = String(value || "").trim();
+  if (!ip || ip.length > 45 || /[,\s%]/.test(ip)) return false;
+
+  const octets = ip.split(".");
+  if (octets.length === 4 && octets.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255)) {
+    return true;
+  }
+
+  if (!ip.includes(":") || !/^[0-9a-f:.]+$/i.test(ip)) return false;
+  try {
+    // WHATWG URL parsing validates IPv6 literals, including compressed forms.
+    new URL("http://[" + ip + "]/");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export function getClientIpAddress(request) {
+  if (!request || !request.headers) return null;
+
+  // Cloudflare's IPv6 header preserves the original address when Pseudo IPv4
+  // is configured to overwrite CF-Connecting-IP.
+  const ipv6 = request.headers.get("cf-connecting-ipv6");
+  const connecting = request.headers.get("cf-connecting-ip");
+  const candidate = ipv6 || connecting || "";
+  return isValidIpAddress(candidate) ? candidate.trim() : null;
+}
+
 export function parseTrackingContext(value, request) {
   if (typeof value === "string") {
     try { value = JSON.parse(value); } catch (_) { value = {}; }
@@ -97,6 +127,7 @@ export function parseTrackingContext(value, request) {
     page_title: cleanText(c.page_title, 300),
     referrer: safeReferrer(c.referrer),
     country_code: cleanText(request && request.cf && request.cf.country, 2).toUpperCase(),
+    ip_address: getClientIpAddress(request),
     first_touch: safeTouch(c.first_touch),
     last_touch: safeTouch(c.last_touch),
     device: safeDevice(c.device)
@@ -154,7 +185,8 @@ export async function upsertIdentity(env, context) {
       first_touch: context.first_touch,
       last_touch: context.last_touch,
       latest_device: context.device,
-      latest_country_code: context.country_code || null
+      latest_country_code: context.country_code || null,
+      last_ip_address: context.ip_address || null
     },
     prefer: "resolution=merge-duplicates,return=minimal"
   });
@@ -166,6 +198,7 @@ export async function upsertIdentity(env, context) {
       landing_page: context.page_path,
       referrer: context.referrer,
       country_code: context.country_code || null,
+      ip_address: context.ip_address || null,
       attribution: context.last_touch,
       device: context.device
     },
@@ -191,6 +224,7 @@ export async function createLeadDraft(env, raw, request) {
       page_title: context.page_title,
       referrer: context.referrer,
       country_code: context.country_code || null,
+      ip_address: context.ip_address || null,
       first_touch: context.first_touch,
       last_touch: context.last_touch,
       device: context.device
@@ -234,6 +268,7 @@ export async function recordVisitorEvent(env, raw, request) {
       page_path: context.page_path,
       page_title: context.page_title,
       referrer: context.referrer,
+      ip_address: context.ip_address || null,
       event_data: eventData
     }
   });
@@ -245,7 +280,8 @@ export async function recordVisitorEvent(env, raw, request) {
         phone_number: cleanText(eventData.phone_number, 40),
         page_url: context.page_url,
         page_path: context.page_path,
-        source: cleanText(eventData.button_location, 80)
+        source: cleanText(eventData.button_location, 80),
+        ip_address: context.ip_address || null
       }
     });
   }
@@ -271,6 +307,7 @@ export async function saveSubmittedLead(env, raw, request) {
     page_title: context.page_title,
     referrer: context.referrer,
     country_code: context.country_code || null,
+    ip_address: context.ip_address || null,
     first_touch: context.first_touch,
     last_touch: context.last_touch,
     device: context.device,
