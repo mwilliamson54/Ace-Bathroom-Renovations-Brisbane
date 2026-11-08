@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { onRequest as leadStart } from "../functions/api/lead-start.js";
 import { onRequest as track } from "../functions/api/track.js";
@@ -81,6 +82,9 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 try {
+  const gasSource = await readFile(new URL("../integrations/google-apps-script/Code.gs", import.meta.url), "utf8");
+  assert.match(gasSource, /ipAddress:\s*pick\('ipAddress'\)/, "Apps Script parser must accept the Cloudflare-derived IP field");
+  assert.match(gasSource, /row\[ipColumn - 1\]\s*=\s*data\.ipAddress/, "Apps Script must write IP Address into the sheet row");
   const requestContext = { cf: { country: "AU" } };
   const ipv6Request = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
     headers: {
