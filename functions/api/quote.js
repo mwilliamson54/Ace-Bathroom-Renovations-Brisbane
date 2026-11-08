@@ -186,7 +186,7 @@ async function handlePost(context) {
   }
 
   const data = fieldsFrom(form);
-  const trackingContext = parseTrackingContext(data.trackingContext);
+  const trackingContext = parseTrackingContext(data.trackingContext, request);
   let trackingLeadId = "";
 
   // Diagnostic trail. Deliberately logs no names, phone numbers, emails or message
