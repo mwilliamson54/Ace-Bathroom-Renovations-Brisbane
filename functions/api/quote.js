@@ -113,7 +113,7 @@ function enquiryHtml(data) {
   </body></html>`;
 }
 
-async function sendWebhook(env, data) {
+async function sendWebhook(env, data, ipAddress) {
   if (!env.QUOTE_WEBHOOK_URL) return { skipped: true };
   // Only pass the enquiry fields needed by the relay. Visitor IDs, session IDs
   // and campaign attribution remain in Supabase and are not sent to Apps Script.
@@ -130,6 +130,7 @@ async function sendWebhook(env, data) {
       site: "acebathroomrenovationsbrisbane.com",
       receivedAt: new Date().toISOString(),
       ...enquiry,
+      ipAddress: clean(ipAddress, 45),
       honeypot: undefined,
     }),
   });
@@ -319,7 +320,7 @@ async function processAcceptedSubmission(context, data, trackingContext, trace) 
   let delivered = false;
   let deliveryError = "";
   try {
-    const result = await sendWebhook(env, data);
+    const result = await sendWebhook(env, data, trackingContext && trackingContext.ip_address);
     delivered = Boolean(result && result.sent);
   } catch (error) {
     deliveryError = String((error && error.message) || error).slice(0, 300);
