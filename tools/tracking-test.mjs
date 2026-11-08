@@ -51,6 +51,7 @@ const env = {
 const realFetch = globalThis.fetch;
 const addCloudflareCountry = (request) => {
   Object.defineProperty(request, "cf", { value: { country: "AU" } });
+  request.headers.set("CF-Connecting-IP", "203.0.113.24");
   return request;
 };
 globalThis.fetch = async (input, init = {}) => {
@@ -102,6 +103,7 @@ try {
   assert.equal(startLeadInsert.body.id, leadId);
   assert.equal(startLeadInsert.body.status, "draft");
   assert.equal(startLeadInsert.body.country_code, "AU");
+  assert.equal(startLeadInsert.body.ip_address, "203.0.113.24");
   assert.equal(startLeadInsert.headers.apikey, env.SUPABASE_SECRET_KEY);
   assert.ok(!("authorization" in startLeadInsert.headers), "opaque sb_secret key must not be used as a Bearer JWT");
   assert.ok(calls.filter((call) => call.url.includes("supabase.co")).every((call) =>
@@ -121,7 +123,8 @@ try {
   assert.equal(eventResponse.status, 200);
   assert.equal((await eventResponse.json()).ok, true);
   assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_events") && call.body.event_name === "call_click"));
-  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_call_clicks")));
+  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_call_clicks") && call.body.ip_address === "203.0.113.24"));
+  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_events") && call.body.ip_address === "203.0.113.24"));
 
   const form = new FormData();
   form.set("name", "Example Visitor");
@@ -177,6 +180,7 @@ try {
   assert.equal(new URL(submittedUpdate.url).searchParams.get("visitor_id"), "eq." + visitorId);
   assert.equal(submittedUpdate.body.customer_name, "Example Visitor");
   assert.equal(submittedUpdate.body.country_code, "AU");
+  assert.equal(submittedUpdate.body.ip_address, "203.0.113.24");
   assert.equal(deliveredUpdate.body.delivery_status, "delivered");
 
   const relayCalls = calls.filter((call) => call.url.includes("script.google.com"));
@@ -184,10 +188,12 @@ try {
   assert.ok(!("leadId" in relayCalls[0].body), "lead UUID remains in Supabase and is not sent to Apps Script");
   assert.ok(!("trackingContext" in relayCalls[0].body), "visitor/session and campaign context remains in Supabase");
   assert.ok(!("tracking_context" in relayCalls[0].body), "snake-case tracking context is not sent to Apps Script");
+  assert.equal(relayCalls[0].body.ipAddress, "203.0.113.24", "Apps Script receives the IP resolved server-side by Cloudflare");
   assert.ok(!calls.some((call) => call.url.includes("resend.com")), "Resend should not run when Apps Script is configured");
 
   console.log("PASS  CTA click creates a Supabase draft");
-  console.log("PASS  Visitor and call-click events are stored");
+  console.log("PASS  Visitor, session, event and call-click IP addresses are stored");
+  console.log("PASS  Apps Script relay receives server-derived IP address");
   console.log("PASS  Quote submission updates the matching draft row");
   console.log("PASS  Apps Script delivery status is written to that same row");
   console.log("PASS  Google Apps Script is the sole delivery route when configured");
