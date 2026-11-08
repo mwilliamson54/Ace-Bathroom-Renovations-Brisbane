@@ -38,6 +38,10 @@ const context = {
 };
 
 const calls = [];
+const backgroundTasks = [];
+let releaseRelay;
+let holdRelay = false;
+const relayGate = new Promise((resolve) => { releaseRelay = resolve; });
 const env = {
   SUPABASE_URL: "https://wovefwxtxxfynoqlwjfk.supabase.co/rest/v1/",
   SUPABASE_SECRET_KEY: "sb_secret_test_key",
@@ -56,6 +60,7 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push({ url, method, body, headers: init.headers || {} });
 
   if (url.includes("script.google.com")) {
+    if (holdRelay) await relayGate;
     return new Response(JSON.stringify({ ok: true, id: "apps-script-test", sheet: "ok" }), {
       status: 200, headers: { "content-type": "application/json" }
     });
@@ -133,15 +138,33 @@ try {
   form.set("lead_id", leadId);
   form.set("tracking_context", JSON.stringify(context));
 
+  holdRelay = true;
   const quoteRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/quote", {
     method: "POST",
     body: form
   }));
-  const quoteResponse = await quote({ request: quoteRequest, env });
+  const quoteResponse = await quote({
+    request: quoteRequest,
+    env,
+    waitUntil(task) { backgroundTasks.push(task); }
+  });
   const quoteBody = await quoteResponse.json();
-  assert.equal(quoteResponse.status, 200);
+  assert.equal(quoteResponse.status, 202);
   assert.equal(quoteBody.ok, true);
+  assert.equal(quoteBody.accepted, true);
+  assert.equal(quoteBody.status, "processing");
   assert.equal(quoteBody.lead_id, leadId);
+  assert.equal(backgroundTasks.length, 1, "fulfillment should be registered with waitUntil");
+  // The background processor first upserts visitor/session/lead rows. Let those
+  // microtasks reach the deliberately delayed Apps Script relay.
+  for (let i = 0; i < 30 && !calls.some((call) => call.url.includes("script.google.com")); i++) {
+    await Promise.resolve();
+  }
+  assert.equal(calls.filter((call) => call.url.includes("script.google.com")).length, 1, "relay should be scheduled in the background");
+
+  // Release the deliberately delayed relay and await the post-response work.
+  releaseRelay();
+  await Promise.all(backgroundTasks);
 
   const leadPatches = calls.filter((call) =>
     call.method === "PATCH" && call.url.includes("ace_quote_leads")
