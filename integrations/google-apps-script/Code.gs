@@ -99,6 +99,7 @@ function parseBody(e) {
     timeline: pick('timeline'),
     message: pick('message'),
     source: pick('source') || 'website',
+    ipAddress: pick('ipAddress'),
     consent: parsed.consent === true || parsed.consent === 'yes' || parsed.consent === 'on'
   };
 }
