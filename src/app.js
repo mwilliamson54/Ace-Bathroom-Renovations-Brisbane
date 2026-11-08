@@ -452,15 +452,13 @@
       if (pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) leadId = sessionStorage.getItem("ace_pending_lead_id") || "";
       else { sessionStorage.removeItem("ace_pending_lead_id"); sessionStorage.removeItem("ace_pending_lead_created_at"); }
     } catch (_) {}
-    var leadPromise = null;
     var started = false;
     function show(kind, html) {
       if (!status) return;
       status.className = "form-status is-visible form-status--" + kind;
       status.innerHTML = html;
     }
-    function createLead() {
-      if (leadPromise) return leadPromise;
+    function ensureLeadId() {
       if (!leadId) {
         try {
           var pendingAt = Number(sessionStorage.getItem("ace_pending_lead_created_at") || 0);
@@ -468,54 +466,109 @@
           if (pendingId && pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) leadId = pendingId;
         } catch (_) {}
       }
-      if (!leadId) leadId = ATTRIBUTION.startLead((form.querySelector('[name="source"]')||{}).value || "website", form.id === "contact-form" ? "contact" : "quote");
-      leadPromise = fetch("/api/lead-start", {
-        method:"POST", headers:{"content-type":"application/json"},
-        body:JSON.stringify(ATTRIBUTION.payload({lead_id:leadId,form_type:form.id === "contact-form" ? "contact" : "quote", source:(form.querySelector('[name="source"]')||{}).value || "website"}))
-      }).then(function(r){return r.json().then(function(b){return {ok:r.ok,body:b};});})
-        .then(function(r){ if(r.ok && r.body && r.body.ok) { leadId=r.body.lead_id; var hidden=form.querySelector('[name="lead_id"]'); if(!hidden){hidden=document.createElement("input");hidden.type="hidden";hidden.name="lead_id";form.appendChild(hidden);} hidden.value=leadId; } return leadId; })
-        .catch(function(){ return ""; });
-      return leadPromise;
+      if (!leadId) {
+        leadId = ATTRIBUTION.startLead(
+          (form.querySelector('[name="source"]') || {}).value || "website",
+          form.id === "contact-form" ? "contact" : "quote"
+        );
+      }
+      return leadId;
     }
-    form.addEventListener("click", function(e){
+    function createLead() {
+      // Draft creation is intentionally fire-and-forget. Submission can create or
+      // update the same lead UUID, so it never has to wait for this network request.
+      ensureLeadId();
+    }
+    form.addEventListener("click", function(e) {
       var submitButton = e.target.closest ? e.target.closest('button[type="submit"]') : null;
-      if (submitButton) ATTRIBUTION.event("quote_click",{form_type:form.id === "contact-form" ? "contact" : "quote",button_location:"form_submit"});
+      if (submitButton) ATTRIBUTION.event("quote_click", {
+        form_type: form.id === "contact-form" ? "contact" : "quote",
+        button_location: "form_submit"
+      });
     });
-    form.addEventListener("focusin", function(){ if(!started){started=true;ATTRIBUTION.event("form_start",{form_type:form.id});createLead();} });
+    form.addEventListener("focusin", function() {
+      if (!started) {
+        started = true;
+        ATTRIBUTION.event("form_start", { form_type: form.id });
+        createLead();
+      }
+    });
     var quoteTarget = form.id === "quote-form" ? $("#quote-form") : form;
     if (form.id === "quote-form" && quoteTarget) {
-      var observer = new IntersectionObserver(function(entries){ entries.forEach(function(entry){ if(entry.isIntersecting && !started){started=true;ATTRIBUTION.event("quote_form_view");} }); }, {threshold:0.25});
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting && !started) {
+            started = true;
+            ATTRIBUTION.event("quote_form_view");
+          }
+        });
+      }, { threshold: 0.25 });
       observer.observe(quoteTarget);
     }
-    form.addEventListener("submit", function (e) {
+    form.addEventListener("submit", function(e) {
       e.preventDefault();
       if (!form.checkValidity()) { form.reportValidity(); return; }
       var consent = form.querySelector('input[name="consent"]');
-      if (consent && !consent.checked) { show("error","Please confirm you agree to be contacted about this enquiry."); consent.focus(); return; }
-      if (submit) { submit.disabled=true; submit.dataset.label=submit.textContent; submit.textContent="Sending…"; }
-      show("info","Sending your enquiry…");
+      if (consent && !consent.checked) {
+        show("error", "Please confirm you agree to be contacted about this enquiry.");
+        consent.focus();
+        return;
+      }
+
+      // Start the lead draft if this visitor came straight to the form. Do not
+      // await that request: /api/quote upserts the same UUID as a fallback.
+      var currentLeadId = ensureLeadId();
       var data = new FormData(form);
-      createLead().then(function(){
-        if (leadId) data.set("lead_id",leadId);
-        var context = ATTRIBUTION.payload();
-        data.set("tracking_context", JSON.stringify(context));
-        return fetch(form.getAttribute("action"),{method:"POST",body:data,headers:{"Accept":"application/json"}});
-      }).then(function(res){return res.json().catch(function(){return {};}).then(function(body){return {ok:res.ok,body:body};});})
-      .then(function(result){
-        if(result.ok && result.body.ok){
-          ATTRIBUTION.event("generate_lead",{form_type:form.id,lead_status:"submitted"});
-          form.reset(); leadId=""; leadPromise=null; started=false;
-          try { sessionStorage.removeItem("ace_pending_lead_id"); sessionStorage.removeItem("ace_pending_lead_created_at"); } catch (_) {}
-          show("success",result.body.message || "Thanks — your enquiry has been received. We will be in touch shortly.");
+      if (currentLeadId) data.set("lead_id", currentLeadId);
+      data.set("form_type", form.id === "contact-form" ? "contact" : "quote");
+      data.set("tracking_context", JSON.stringify(ATTRIBUTION.payload()));
+
+      if (submit) {
+        submit.disabled = true;
+        submit.dataset.label = submit.textContent;
+        submit.textContent = "Submitting…";
+      }
+      show("info", "Submitting your enquiry…");
+
+      fetch(form.getAttribute("action"), {
+        method: "POST",
+        body: data,
+        headers: { "Accept": "application/json" },
+        keepalive: true
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; }).then(function(body) {
+          return { ok: res.ok, status: res.status, body: body };
+        });
+      }).then(function(result) {
+        if (result.ok && result.body.ok && result.body.accepted) {
+          ATTRIBUTION.event("generate_lead", { form_type: form.id, lead_status: "accepted" });
+          form.reset();
+          leadId = "";
+          started = false;
+          try {
+            sessionStorage.removeItem("ace_pending_lead_id");
+            sessionStorage.removeItem("ace_pending_lead_created_at");
+          } catch (_) {}
+          show("success", result.body.message || "Thanks — we have received your enquiry. Our team will contact you shortly.");
         } else {
-          ATTRIBUTION.event("form_error",{form_type:form.id});
-          show("error",result.body && result.body.message ? result.body.message : "We could not send the form. Please call (07) 8590 6941 or email AceBathroomRenovationsBrisbane@gmail.com.");
+          ATTRIBUTION.event("form_error", { form_type: form.id, status_code: result.status });
+          show("error", result.body && result.body.message
+            ? result.body.message
+            : "We could not accept the form. Please call (07) 8590 6941 or email AceBathroomRenovationsBrisbane@gmail.com.");
         }
-      }).catch(function(){
-        show("error",'The form could not be sent from this device. Please call <a href="tel:+61785906941">(07) 8590 6941</a> or email <a href="mailto:AceBathroomRenovationsBrisbane@gmail.com">AceBathroomRenovationsBrisbane@gmail.com</a>.');
-      }).finally(function(){ if(submit){submit.disabled=false;submit.textContent=submit.dataset.label || "Send enquiry";} });
+      }).catch(function() {
+        ATTRIBUTION.event("form_error", { form_type: form.id, network_error: true });
+        show("error", 'We could not connect to submit your enquiry. Please call <a href="tel:+61785906941">(07) 8590 6941</a> or email <a href="mailto:AceBathroomRenovationsBrisbane@gmail.com">AceBathroomRenovationsBrisbane@gmail.com</a>.');
+      }).finally(function() {
+        if (submit) {
+          submit.disabled = false;
+          submit.textContent = submit.dataset.label || "Send enquiry";
+        }
+      });
     });
-    window.addEventListener("beforeunload",function(){ if(started && !leadId) ATTRIBUTION.event("form_abandon",{form_type:form.id}); });
+    window.addEventListener("beforeunload", function() {
+      if (started && !leadId) ATTRIBUTION.event("form_abandon", { form_type: form.id });
+    });
   });
 
   /* ---------------- Calculator and gallery interactions ---------------- */
