@@ -14,9 +14,9 @@ This feature adds pseudonymous first-party visitor/session identifiers, campaign
 ## 1. Run the Supabase migration
 
 1. Open the Supabase project and go to SQL Editor.
-2. Open the repository file supabase/migrations/20261104000100_visitor_lead_attribution.sql.
-3. Copy the whole SQL file into a new SQL Editor query and run it once.
-4. In Table Editor, confirm these tables exist: ace_visitors, ace_sessions, ace_events, ace_quote_leads and ace_call_clicks.
+2. If you have not already installed the tracking schema, run supabase/migrations/20261104000100_visitor_lead_attribution.sql first.
+3. Run the new additive migration supabase/migrations/20261108000200_add_visitor_ip_addresses.sql. It adds INET columns to the existing visitor, session, event, quote-lead and call-click tables without deleting existing records.
+4. In Table Editor, confirm the five tables exist and that they have their IP fields: ace_visitors.last_ip_address, and ip_address on ace_sessions, ace_events, ace_quote_leads and ace_call_clicks.
 
 All five tables have Row Level Security enabled. No anonymous or authenticated table policies are created. Do not add public read/write policies to these tables.
 
