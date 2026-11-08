@@ -99,6 +99,7 @@ function parseBody(e) {
     timeline: pick('timeline'),
     message: pick('message'),
     source: pick('source') || 'website',
+    ipAddress: pick('ipAddress'),
     consent: parsed.consent === true || parsed.consent === 'yes' || parsed.consent === 'on'
   };
 }
@@ -131,20 +132,34 @@ function getSheet_() {
 
 function appendToSheet(data) {
   var sheet = getSheet_();
+  var baseHeaders = [
+    'Received', 'Name', 'Phone', 'Email', 'Suburb', 'Property',
+    'Project', 'Budget', 'Timeline', 'Message', 'Source', 'Consent'
+  ];
 
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      'Received', 'Name', 'Phone', 'Email', 'Suburb', 'Property',
-      'Project', 'Budget', 'Timeline', 'Message', 'Source', 'Consent'
-    ]);
-    sheet.getRange(1, 1, 1, 12).setFontWeight('bold');
+    sheet.appendRow(baseHeaders);
     sheet.setFrozenRows(1);
   }
-  sheet.appendRow([
+
+  // Add the new column without disrupting an existing sheet or its old rows.
+  var lastColumn = Math.max(sheet.getLastColumn(), baseHeaders.length);
+  var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  var ipColumn = headers.indexOf('IP Address') + 1;
+  if (!ipColumn) {
+    ipColumn = lastColumn + 1;
+    sheet.getRange(1, ipColumn).setValue('IP Address');
+  }
+  sheet.getRange(1, 1, 1, Math.max(ipColumn, baseHeaders.length)).setFontWeight('bold');
+
+  var row = [
     data.receivedAt, data.name, data.phone, data.email, data.suburb, data.property,
     data.project, data.budget, data.timeline, data.message, data.source,
     data.consent ? 'yes' : 'no'
-  ]);
+  ];
+  while (row.length < ipColumn - 1) row.push('');
+  row[ipColumn - 1] = data.ipAddress || '';
+  sheet.appendRow(row);
 }
 
 function sendEnquiryEmail(data) {
