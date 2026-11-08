@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { onRequest as leadStart } from "../functions/api/lead-start.js";
 import { onRequest as track } from "../functions/api/track.js";
 import { onRequest as quote } from "../functions/api/quote.js";
+import { getClientIpAddress } from "../functions/_lib/tracking.js";
 
 const visitorId = "a3c8c1e2-8b29-4bb7-9d53-61f885b77010";
 const sessionId = "b51b2e65-1058-4ea1-8a9e-7a8728eb7f82";
 const leadId = "c4ee7188-ae3b-4d41-9b0b-8484c9fa2b7b";
 const context = {
+  // Deliberately spoofed browser field: the server must ignore it.
+  ip_address: "198.51.100.99",
   visitor_id: visitorId,
   session_id: sessionId,
   page_url: "https://acebathroomrenovationsbrisbane.com/get-a-quote/?utm_source=google&utm_campaign=brisbane",
@@ -79,6 +82,17 @@ globalThis.fetch = async (input, init = {}) => {
 
 try {
   const requestContext = { cf: { country: "AU" } };
+  const ipv6Request = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
+    headers: {
+      "CF-Connecting-IP": "198.51.100.20",
+      "CF-Connecting-IPv6": "2001:db8::24"
+    }
+  });
+  assert.equal(getClientIpAddress(ipv6Request), "2001:db8::24", "the original IPv6 header should take priority when present");
+  const badIpRequest = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
+    headers: { "CF-Connecting-IP": "not-an-ip, 198.51.100.1" }
+  });
+  assert.equal(getClientIpAddress(badIpRequest), null, "untrusted or malformed IP header values should be discarded");
 
   const startRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/lead-start", {
     method: "POST",
@@ -103,7 +117,11 @@ try {
   assert.equal(startLeadInsert.body.id, leadId);
   assert.equal(startLeadInsert.body.status, "draft");
   assert.equal(startLeadInsert.body.country_code, "AU");
-  assert.equal(startLeadInsert.body.ip_address, "203.0.113.24");
+  assert.equal(startLeadInsert.body.ip_address, "203.0.113.24", "Supabase must store the trusted edge IP, not the spoofed browser field");
+  const visitorUpsert = calls.find((call) => call.method === "POST" && call.url.includes("ace_visitors"));
+  const sessionUpsert = calls.find((call) => call.method === "POST" && call.url.includes("ace_sessions"));
+  assert.equal(visitorUpsert.body.last_ip_address, "203.0.113.24");
+  assert.equal(sessionUpsert.body.ip_address, "203.0.113.24");
   assert.equal(startLeadInsert.headers.apikey, env.SUPABASE_SECRET_KEY);
   assert.ok(!("authorization" in startLeadInsert.headers), "opaque sb_secret key must not be used as a Bearer JWT");
   assert.ok(calls.filter((call) => call.url.includes("supabase.co")).every((call) =>
