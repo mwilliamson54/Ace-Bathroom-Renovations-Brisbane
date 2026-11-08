@@ -250,8 +250,51 @@ async function handlePost(context) {
     return finish(json({ ok: false, message: errors[0] }, 422), "invalid", { error: errors[0] });
   }
 
-  // Save the completed form against the click-created draft. Database failures
-  // are logged but never block the existing email/webhook delivery path.
+  // The visitor-facing response must not wait for Supabase, Apps Script or KV.
+  // Pages Functions waitUntil keeps those tasks running after we return 202.
+  if (!env.QUOTE_WEBHOOK_URL) {
+    return finish(
+      json(
+        {
+          ok: false,
+          message: `The online form is not connected right now. Please call ${PHONE_DISPLAY} or email ${EMAIL} and we will respond personally.`,
+          fallback: { phone: PHONE_DISPLAY, email: EMAIL },
+        },
+        503
+      ),
+      "not_configured"
+    );
+  }
+
+  const response = json({
+    ok: true,
+    accepted: true,
+    status: "processing",
+    message: `Thanks ${data.name.split(" ")[0]} — we have received your enquiry. Our team will contact you shortly.`,
+    lead_id: data.leadId || null,
+  }, 202);
+
+  const backgroundTask = processAcceptedSubmission(context, data, trackingContext, trace)
+    .catch((error) => {
+      // Never let a background failure change the already-sent visitor response.
+      console.error("Background quote processing failed:", error && error.message);
+    });
+
+  // Cloudflare Pages Functions provide waitUntil on the request context.
+  // In local/test contexts without it, await the task so errors remain observable.
+  if (typeof context.waitUntil === "function") {
+    context.waitUntil(backgroundTask);
+    return response;
+  }
+
+  await backgroundTask;
+  return response;
+}
+
+async function processAcceptedSubmission(context, data, trackingContext, trace) {
+  const { request, env } = context;
+  let trackingLeadId = "";
+
   try {
     trackingLeadId = await saveSubmittedLead(env, {
       lead_id: data.leadId,
@@ -273,60 +316,50 @@ async function handlePost(context) {
     console.error("Supabase lead save failed:", error && error.message);
   }
 
-  const configured = Boolean(env.QUOTE_WEBHOOK_URL);
-  if (!configured) {
-    return finish(
-      json(
-        {
-          ok: false,
-          message: `The online form is not connected right now. Please call ${PHONE_DISPLAY} or email ${EMAIL} and we will respond personally.`,
-          fallback: { phone: PHONE_DISPLAY, email: EMAIL },
-        },
-        503
-      ),
-      "not_configured"
-    );
+  let delivered = false;
+  let deliveryError = "";
+  try {
+    const result = await sendWebhook(env, data);
+    delivered = Boolean(result && result.sent);
+  } catch (error) {
+    deliveryError = String((error && error.message) || error).slice(0, 300);
+    console.error("Google Apps Script delivery failed:", deliveryError);
   }
 
-  // Google Apps Script is the required production delivery route.
-  // Do not silently fall back to another provider if the relay is missing or down.
-  const results = await Promise.allSettled([sendWebhook(env, data)]);
-  const delivered = results.some((r) => r.status === "fulfilled" && r.value && r.value.sent);
+  const outcome = delivered ? "delivered" : "undelivered";
+  await record(env, {
+    at: new Date().toISOString(),
+    outcome,
+    ...data,
+    honeypotHit: Boolean(data.honeypot),
+    ua: clean(request.headers.get("user-agent"), 160),
+    referer: clean(request.headers.get("referer"), 160),
+    country: (request.cf && request.cf.country) || "",
+    deliveryError,
+  });
 
-  if (!delivered) {
-    const detail = results
-      .filter((r) => r.status === "rejected")
-      .map((r) => String((r.reason && r.reason.message) || r.reason).slice(0, 300));
-    for (const message of detail) console.error("Quote delivery failed:", message);
+  if (trackingLeadId) {
+    try {
+      await updateLeadDelivery(
+        env,
+        trackingLeadId,
+        trackingContext && trackingContext.visitor_id,
+        delivered ? "delivered" : "failed",
+        deliveryError,
+        ""
+      );
+    } catch (error) {
+      console.error("Supabase delivery status update failed:", error && error.message);
+    }
+  }
+
+  if (delivered) {
+    console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
+  } else {
     console.error(JSON.stringify({ ...trace, event: "quote_undelivered" }));
-    return finish(
-      json(
-        {
-          ok: false,
-          message: `We could not deliver the form from this device. Please call ${PHONE_DISPLAY} or email ${EMAIL} so your enquiry is not delayed.`,
-          fallback: { phone: PHONE_DISPLAY, email: EMAIL },
-        },
-        502
-      ),
-      "undelivered",
-      { deliveryError: detail.join(" | ") }
-    );
   }
-
-  console.log(JSON.stringify({ ...trace, event: "quote_delivered" }));
-  const resendId = results
-    .map((r) => (r.status === "fulfilled" && r.value && r.value.id) || "")
-    .find(Boolean) || "";
-  return finish(
-    json({
-      ok: true,
-      message: `Thanks ${data.name.split(" ")[0]} — your enquiry has been received. We will call you on ${data.phone} during opening hours, 7am–10pm, seven days. If it is urgent, call ${PHONE_DISPLAY}.`,
-      lead_id: trackingLeadId || null,
-    }),
-    "delivered",
-    { resendId }
-  );
 }
+
 
 async function handleGet() {
   return json({ ok: false, message: "Use the quote form to submit an enquiry." }, 405);
