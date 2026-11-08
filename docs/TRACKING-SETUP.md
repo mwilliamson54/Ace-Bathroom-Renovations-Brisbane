@@ -4,7 +4,7 @@ This feature adds pseudonymous first-party visitor/session identifiers, campaign
 
 ## Architecture
 
-- Browser tracking runs in src/app.js with localStorage and sessionStorage identifiers. It does not use browser fingerprinting and does not store IP addresses.
+- Browser tracking runs in src/app.js with localStorage and sessionStorage identifiers. It does not use browser fingerprinting. The Cloudflare Pages Functions capture the visitor IP server-side from CF-Connecting-IP (or CF-Connecting-IPv6 when Cloudflare Pseudo IPv4 overwrites the former); the browser never supplies the IP.
 - POST /api/track writes allowlisted events.
 - POST /api/lead-start creates the draft quote record.
 - POST /api/quote keeps the existing validation and Google Apps Script email relay, and adds the form data to the existing draft row.
@@ -52,7 +52,7 @@ The Apps Script URL token is a shared secret. Keep it in Cloudflare, not in brow
 - First-touch and last non-direct campaign context: landing path, external referrer, UTM source/medium/campaign/term/content and available gclid, gbraid, wbraid, msclkid and fbclid values.
 - Pseudonymous first-party visitor ID and a session ID that renews after 30 minutes of inactivity.
 - Device category, browser family, operating-system family, screen dimensions, language and timezone.
-- Coarse country code supplied by Cloudflare, where available. No visitor IP is stored by this feature.
+- Coarse country code and server-derived IP address supplied by Cloudflare, where available. The IP is not accepted from browser payload fields.
 - Page views, service and pricing page views, Get a Quote clicks, quote form views/starts/abandonments/errors, completed leads, phone-link clicks, scroll milestones, calculator interactions, gallery filters and FAQ opens.
 
 URLs stored in Supabase have query strings and fragments removed. Campaign parameters are stored in separate attribution fields. Device and browser labels are best-effort categories, not definitive identity information.
@@ -88,4 +88,4 @@ GA4 receives event names including quote_click, call_click, generate_lead, form_
 
 The privacy policy has been updated to explain GA4, first-party identifiers, visitor activity, the draft-to-submitted lead connection and the service providers involved. Review consent and privacy requirements for the locations you target before using the tracking data for advertising or profiling. Set a deliberate retention period for visitor events and enquiry records; the SQL migration does not automatically delete them.
 
-After the form has passed validation and the Apps Script URL is configured, the browser receives HTTP 202 Accepted without waiting for Supabase, Apps Script or KV. A 202 confirms that Cloudflare accepted the submission for background processing; it does not confirm that the email has already arrived. The background job attempts the Supabase save, Apps Script relay, KV archive and final delivery-status update. Cloudflare `waitUntil()` has a finite post-response lifetime, so use a Cloudflare Queue if durable delivery and automatic retries become a requirement. Supabase write errors do not block the existing Apps Script email attempt. Never log customer names, phone numbers, email addresses or message bodies in Cloudflare logs.
+After the form has passed validation and the Apps Script URL is configured, the browser receives HTTP 202 Accepted without waiting for Supabase, Apps Script or KV. A 202 confirms that Cloudflare accepted the submission for background processing; it does not confirm that the email has already arrived. The background job attempts the Supabase save, Apps Script relay, KV archive and final delivery-status update. Cloudflare `waitUntil()` has a finite post-response lifetime, so use a Cloudflare Queue if durable delivery and automatic retries become a requirement. Supabase write errors do not block the existing Apps Script email attempt. Never log customer names, phone numbers, email addresses, IP addresses or message bodies in Cloudflare logs. Restrict access to the Supabase tables and Google Sheet, and define an appropriate IP/enquiry retention period. The IP can be personal information when associated with contact and visitor records.
