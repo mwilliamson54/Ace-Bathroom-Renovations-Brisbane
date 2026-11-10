@@ -391,6 +391,8 @@ export function renderPage({
     y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
   })(window, document, "clarity", "script", "zb8hjqyg4y");
 </script>
+<!-- Ahrefs Webmaster Analytics -->
+<script src="https://analytics.ahrefs.com/analytics.js" data-key="Cy+EelY5rkeN5FuLGVgz6A" async></script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-4LT7P577ZF"></script>
 <script>
