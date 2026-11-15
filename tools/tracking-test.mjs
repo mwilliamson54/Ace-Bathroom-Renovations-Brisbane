@@ -1,12 +1,16 @@
+import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { onRequest as leadStart } from "../functions/api/lead-start.js";
 import { onRequest as track } from "../functions/api/track.js";
 import { onRequest as quote } from "../functions/api/quote.js";
+import { getClientIpAddress } from "../functions/_lib/tracking.js";
 
 const visitorId = "a3c8c1e2-8b29-4bb7-9d53-61f885b77010";
 const sessionId = "b51b2e65-1058-4ea1-8a9e-7a8728eb7f82";
 const leadId = "c4ee7188-ae3b-4d41-9b0b-8484c9fa2b7b";
 const context = {
+  // Deliberately spoofed browser field: the server must ignore it.
+  ip_address: "198.51.100.99",
   visitor_id: visitorId,
   session_id: sessionId,
   page_url: "https://acebathroomrenovationsbrisbane.com/get-a-quote/?utm_source=google&utm_campaign=brisbane",
@@ -51,6 +55,7 @@ const env = {
 const realFetch = globalThis.fetch;
 const addCloudflareCountry = (request) => {
   Object.defineProperty(request, "cf", { value: { country: "AU" } });
+  request.headers.set("CF-Connecting-IP", "203.0.113.24");
   return request;
 };
 globalThis.fetch = async (input, init = {}) => {
@@ -77,7 +82,21 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 try {
+  const gasSource = await readFile(new URL("../integrations/google-apps-script/Code.gs", import.meta.url), "utf8");
+  assert.match(gasSource, /ipAddress:\s*pick\('ipAddress'\)/, "Apps Script parser must accept the Cloudflare-derived IP field");
+  assert.match(gasSource, /row\[ipColumn - 1\]\s*=\s*data\.ipAddress/, "Apps Script must write IP Address into the sheet row");
   const requestContext = { cf: { country: "AU" } };
+  const ipv6Request = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
+    headers: {
+      "CF-Connecting-IP": "198.51.100.20",
+      "CF-Connecting-IPv6": "2001:db8::24"
+    }
+  });
+  assert.equal(getClientIpAddress(ipv6Request), "2001:db8::24", "the original IPv6 header should take priority when present");
+  const badIpRequest = new Request("https://acebathroomrenovationsbrisbane.com/api/track", {
+    headers: { "CF-Connecting-IP": "not-an-ip, 198.51.100.1" }
+  });
+  assert.equal(getClientIpAddress(badIpRequest), null, "untrusted or malformed IP header values should be discarded");
 
   const startRequest = addCloudflareCountry(new Request("https://acebathroomrenovationsbrisbane.com/api/lead-start", {
     method: "POST",
@@ -102,6 +121,11 @@ try {
   assert.equal(startLeadInsert.body.id, leadId);
   assert.equal(startLeadInsert.body.status, "draft");
   assert.equal(startLeadInsert.body.country_code, "AU");
+  assert.equal(startLeadInsert.body.ip_address, "203.0.113.24", "Supabase must store the trusted edge IP, not the spoofed browser field");
+  const visitorUpsert = calls.find((call) => call.method === "POST" && call.url.includes("ace_visitors"));
+  const sessionUpsert = calls.find((call) => call.method === "POST" && call.url.includes("ace_sessions"));
+  assert.equal(visitorUpsert.body.last_ip_address, "203.0.113.24");
+  assert.equal(sessionUpsert.body.ip_address, "203.0.113.24");
   assert.equal(startLeadInsert.headers.apikey, env.SUPABASE_SECRET_KEY);
   assert.ok(!("authorization" in startLeadInsert.headers), "opaque sb_secret key must not be used as a Bearer JWT");
   assert.ok(calls.filter((call) => call.url.includes("supabase.co")).every((call) =>
@@ -121,7 +145,8 @@ try {
   assert.equal(eventResponse.status, 200);
   assert.equal((await eventResponse.json()).ok, true);
   assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_events") && call.body.event_name === "call_click"));
-  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_call_clicks")));
+  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_call_clicks") && call.body.ip_address === "203.0.113.24"));
+  assert.ok(calls.some((call) => call.method === "POST" && call.url.includes("ace_events") && call.body.ip_address === "203.0.113.24"));
 
   const form = new FormData();
   form.set("name", "Example Visitor");
@@ -177,6 +202,7 @@ try {
   assert.equal(new URL(submittedUpdate.url).searchParams.get("visitor_id"), "eq." + visitorId);
   assert.equal(submittedUpdate.body.customer_name, "Example Visitor");
   assert.equal(submittedUpdate.body.country_code, "AU");
+  assert.equal(submittedUpdate.body.ip_address, "203.0.113.24");
   assert.equal(deliveredUpdate.body.delivery_status, "delivered");
 
   const relayCalls = calls.filter((call) => call.url.includes("script.google.com"));
@@ -184,10 +210,12 @@ try {
   assert.ok(!("leadId" in relayCalls[0].body), "lead UUID remains in Supabase and is not sent to Apps Script");
   assert.ok(!("trackingContext" in relayCalls[0].body), "visitor/session and campaign context remains in Supabase");
   assert.ok(!("tracking_context" in relayCalls[0].body), "snake-case tracking context is not sent to Apps Script");
+  assert.equal(relayCalls[0].body.ipAddress, "203.0.113.24", "Apps Script receives the IP resolved server-side by Cloudflare");
   assert.ok(!calls.some((call) => call.url.includes("resend.com")), "Resend should not run when Apps Script is configured");
 
   console.log("PASS  CTA click creates a Supabase draft");
-  console.log("PASS  Visitor and call-click events are stored");
+  console.log("PASS  Visitor, session, event and call-click IP addresses are stored");
+  console.log("PASS  Apps Script relay receives server-derived IP address");
   console.log("PASS  Quote submission updates the matching draft row");
   console.log("PASS  Apps Script delivery status is written to that same row");
   console.log("PASS  Google Apps Script is the sole delivery route when configured");
